@@ -100,8 +100,12 @@ func (u *UpdateExcusePolicy) UnmarshalYAML(unmarshal func(any) error) error {
 			u.Bugs[key] = int64(v)
 		case int64:
 			u.Bugs[key] = v
+		case uint:
+			u.Bugs[key] = int64(v)
 		case uint64:
 			u.Bugs[key] = int64(v)
+		default:
+			return fmt.Errorf("update-excuse bug %q: expected integer timestamp, got %T", key, val)
 		}
 	}
 
