@@ -1,6 +1,8 @@
 package ingest
 
 import (
+	"strings"
+
 	"github.com/BAMF0/ubuntu-excuses-data/internal/domain"
 	yaml "github.com/BAMF0/ubuntu-excuses-data/internal/ingest/yaml"
 )
@@ -20,7 +22,7 @@ func toSource(b *domain.Builder, s *yaml.Source) *domain.Source {
 		ComponentID:        b.InternComponent(s.Component),
 		MaintainerID:       b.InternMaintainer(s.Maintainer),
 		VerdictID:          b.InternVerdict(s.MigrationPolicyVerdict),
-		Excuses:            copySlice(s.Excuses),
+		Excuse:             toExcuse(s.Excuses),
 		Hints:              toHints(s.Hints),
 		InvalidatedByOther: s.InvalidatedByOtherPackage,
 		IsCandidate:        s.IsCandidate,
@@ -99,6 +101,50 @@ func toAutopkgtestPolicy(b *domain.Builder, a yaml.AutopkgtestPolicy) domain.Aut
 		dp.Packages[pkg] = archMap
 	}
 	return dp
+}
+
+// toExcuse parses the raw excuse strings into a structured Excuse.
+// The first line is expected to be "Migration status for ... ): <status text>".
+// The status text is split on ": " to separate status from detail.
+func toExcuse(raw []string) domain.Excuse {
+	if len(raw) == 0 {
+		return domain.Excuse{}
+	}
+
+	var statusText string
+	// Find "): " which terminates the "Migration status for pkg (old to new)" prefix.
+	if idx := strings.Index(raw[0], "): "); idx != -1 {
+		statusText = raw[0][idx+3:]
+	} else {
+		statusText = raw[0]
+	}
+
+	excuse := domain.Excuse{
+		Info: copySlice(raw[1:]),
+	}
+
+	// Split on ": " to separate status from detail (e.g. "BLOCKED: reason").
+	if before, after, ok := strings.Cut(statusText, ": "); ok {
+		excuse.Status = parseMigrationStatus(before)
+		excuse.Detail = after
+	} else {
+		excuse.Status = parseMigrationStatus(statusText)
+	}
+
+	return excuse
+}
+
+func parseMigrationStatus(s string) domain.MigrationStatus {
+	switch {
+	case strings.HasPrefix(s, "BLOCKED"):
+		return domain.StatusBlocked
+	case strings.HasPrefix(s, "Will attempt migration"):
+		return domain.StatusWillAttempt
+	case strings.HasPrefix(s, "Waiting"):
+		return domain.StatusWaiting
+	default:
+		return domain.StatusUnknown
+	}
 }
 
 // copySlice returns a shallow copy of s with its own backing array,

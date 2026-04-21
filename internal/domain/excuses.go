@@ -47,6 +47,42 @@ type Excuses struct {
 	Candidates []*Source
 }
 
+// MigrationStatus represents the high-level migration state of a source package.
+type MigrationStatus int
+
+const (
+	// StatusUnknown indicates the migration status could not be determined.
+	StatusUnknown MigrationStatus = iota
+	// StatusBlocked means the package is blocked from migrating.
+	StatusBlocked
+	// StatusWillAttempt means the package will attempt migration.
+	StatusWillAttempt
+	// StatusWaiting means the package is waiting for test results or another condition.
+	StatusWaiting
+)
+
+func (s MigrationStatus) String() string {
+	switch s {
+	case StatusBlocked:
+		return "BLOCKED"
+	case StatusWillAttempt:
+		return "WILL_ATTEMPT"
+	case StatusWaiting:
+		return "WAITING"
+	default:
+		return "UNKNOWN"
+	}
+}
+
+// Excuse holds the parsed migration status for a source package.
+// The Status and Detail fields are extracted from the first "Migration status
+// for …" excuse line; Info contains the remaining informational entries.
+type Excuse struct {
+	Status MigrationStatus
+	Detail string   // reason text after the status (e.g. "Rejected/violates migration policy/introduces a regression")
+	Info   []string // remaining excuse lines (e.g. age info, autopkgtest details)
+}
+
 // Source is the domain representation of a single package migration entry.
 // Repeated categorical strings are stored as IDs into the parent Excuses
 // intern tables rather than as duplicate string values.
@@ -57,7 +93,7 @@ type Source struct {
 	VerdictID    VerdictID
 
 	Dependencies       *Dependencies
-	Excuses            []string
+	Excuse             Excuse
 	Hints              []Hint
 	InvalidatedByOther bool
 	IsCandidate        bool
