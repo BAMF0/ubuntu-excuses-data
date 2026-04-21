@@ -55,8 +55,8 @@ const (
 	StatusUnknown MigrationStatus = iota
 	// StatusBlocked means the package is blocked from migrating.
 	StatusBlocked
-	// StatusWillMigrate means the package will attempt migration.
-	StatusWillMigrate
+	// StatusWillAttempt means the package will attempt migration.
+	StatusWillAttempt
 	// StatusWaiting means the package is waiting for test results or another condition.
 	StatusWaiting
 )
@@ -65,8 +65,8 @@ func (s MigrationStatus) String() string {
 	switch s {
 	case StatusBlocked:
 		return "BLOCKED"
-	case StatusWillMigrate:
-		return "WILL_MIGRATE"
+	case StatusWillAttempt:
+		return "WILL_ATTEMPT"
 	case StatusWaiting:
 		return "WAITING"
 	default:

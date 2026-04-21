@@ -139,7 +139,7 @@ func parseMigrationStatus(s string) domain.MigrationStatus {
 	case strings.HasPrefix(s, "BLOCKED"):
 		return domain.StatusBlocked
 	case strings.HasPrefix(s, "Will attempt migration"):
-		return domain.StatusWillMigrate
+		return domain.StatusWillAttempt
 	case strings.HasPrefix(s, "Waiting"):
 		return domain.StatusWaiting
 	default:

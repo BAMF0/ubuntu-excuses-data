@@ -22,9 +22,9 @@ func TestToExcuse(t *testing.T) {
 			wantInfo:   2,
 		},
 		{
-			name:       "will_migrate",
+			name:       "will_attempt",
 			raw:        []string{"Migration status for pkg (1.0 to 2.0): Will attempt migration (Any information below is purely informational)", "Additional info:"},
-			wantStatus: domain.StatusWillMigrate,
+			wantStatus: domain.StatusWillAttempt,
 			wantDetail: "",
 			wantInfo:   1,
 		},
