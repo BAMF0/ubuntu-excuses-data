@@ -1,0 +1,313 @@
+generated-date: 2026-04-20 12:53:48.193165
+sources:
+- excuses:
+  - 'Migration status for base-files (14ubuntu5 to 14ubuntu6): Waiting for test results,
+    another package or too young (no action required now - check later)'
+  - 'Issues preventing migration:'
+  - 'autopkgtest for dbus/1.16.2-2ubuntu4: <a href="https://autopkgtest.ubuntu.com/packages/d/dbus/resolute/amd64">amd64</a>:
+    <a href="https://autopkgtest.ubuntu.com/running"><span style="background:#99ddff">Test
+    in progress</span></a>, <a href="https://autopkgtest.ubuntu.com/packages/d/dbus/resolute/arm64">arm64</a>:
+    <a href="https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/arm64/d/dbus/20260420_120223_3a99b@/log.gz"><span
+    style="background:#87d96c">Pass</span></a>, <a href="https://autopkgtest.ubuntu.com/packages/d/dbus/resolute/armhf">armhf</a>:
+    <a href="https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/armhf/d/dbus/20260420_120644_31463@/log.gz"><span
+    style="background:#87d96c">Pass</span></a>, <a href="https://autopkgtest.ubuntu.com/packages/d/dbus/resolute/i386">i386</a>:
+    <a href="https://autopkgtest.ubuntu.com/running"><span style="background:#99ddff">Test
+    in progress</span></a>, <a href="https://autopkgtest.ubuntu.com/packages/d/dbus/resolute/ppc64el">ppc64el</a>:
+    <a href="https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/ppc64el/d/dbus/20260420_120246_8259d@/log.gz"><span
+    style="background:#87d96c">Pass</span></a>, <a href="https://autopkgtest.ubuntu.com/packages/d/dbus/resolute/s390x">s390x</a>:
+    <a href="https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/s390x/d/dbus/20260420_115609_9f907@/log.gz"><span
+    style="background:#87d96c">Pass</span></a>'
+  - 'Additional info:'
+  - 0 days old
+  - Ignoring block request by freeze, due to unblock request by ubuntu-release
+  hints:
+  - hint-from: ubuntu-release
+    hint-type: unblock
+  - hint-from: freeze
+    hint-type: block
+  is-candidate: false
+  item-name: base-files
+  maintainer: Ubuntu Developers
+  migration-policy-verdict: REJECTED_TEMPORARILY
+  new-version: 14ubuntu6
+  old-version: 14ubuntu5
+  policy_info:
+    age:
+      age-requirement: 0
+      current-age: 0.04805555555555555
+      verdict: PASS
+    autopkgtest:
+      bash/5.3-2ubuntu1:
+        amd64:
+        - PASS
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/amd64/b/bash/20260420_114305_a5f93@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/b/bash/resolute/amd64
+        - null
+        - null
+        arm64:
+        - PASS
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/arm64/b/bash/20260420_114232_43160@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/b/bash/resolute/arm64
+        - null
+        - null
+        armhf:
+        - PASS
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/armhf/b/bash/20260420_114953_80e5c@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/b/bash/resolute/armhf
+        - null
+        - null
+        i386:
+        - ALWAYSFAIL
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/i386/b/bash/20260420_114300_1daec@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/b/bash/resolute/i386
+        - null
+        - null
+        ppc64el:
+        - PASS
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/ppc64el/b/bash/20260420_114201_ab639@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/b/bash/resolute/ppc64el
+        - null
+        - null
+        s390x:
+        - PASS
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/s390x/b/bash/20260420_114150_f76d4@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/b/bash/resolute/s390x
+        - null
+        - null
+      dbus/1.16.2-2ubuntu4:
+        amd64:
+        - RUNNING
+        - https://autopkgtest.ubuntu.com/running
+        - https://autopkgtest.ubuntu.com/packages/d/dbus/resolute/amd64
+        - null
+        - null
+        arm64:
+        - PASS
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/arm64/d/dbus/20260420_120223_3a99b@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/d/dbus/resolute/arm64
+        - null
+        - null
+        armhf:
+        - PASS
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/armhf/d/dbus/20260420_120644_31463@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/d/dbus/resolute/armhf
+        - null
+        - null
+        i386:
+        - RUNNING
+        - https://autopkgtest.ubuntu.com/running
+        - https://autopkgtest.ubuntu.com/packages/d/dbus/resolute/i386
+        - null
+        - null
+        ppc64el:
+        - PASS
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/ppc64el/d/dbus/20260420_120246_8259d@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/d/dbus/resolute/ppc64el
+        - null
+        - null
+        s390x:
+        - PASS
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/s390x/d/dbus/20260420_115609_9f907@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/d/dbus/resolute/s390x
+        - null
+        - null
+      lsb-release-minimal/12.1-2build1:
+        amd64:
+        - PASS
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/amd64/l/lsb-release-minimal/20260420_120945_b2e77@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/l/lsb-release-minimal/resolute/amd64
+        - null
+        - null
+        arm64:
+        - PASS
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/arm64/l/lsb-release-minimal/20260420_114729_d6427@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/l/lsb-release-minimal/resolute/arm64
+        - null
+        - null
+        armhf:
+        - PASS
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/armhf/l/lsb-release-minimal/20260420_114754_6defb@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/l/lsb-release-minimal/resolute/armhf
+        - null
+        - null
+        i386:
+        - PASS
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/i386/l/lsb-release-minimal/20260420_123955_94334@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/l/lsb-release-minimal/resolute/i386
+        - null
+        - null
+        ppc64el:
+        - PASS
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/ppc64el/l/lsb-release-minimal/20260420_114800_d77e3@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/l/lsb-release-minimal/resolute/ppc64el
+        - null
+        - null
+        s390x:
+        - PASS
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/s390x/l/lsb-release-minimal/20260420_114702_cae4e@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/l/lsb-release-minimal/resolute/s390x
+        - null
+        - null
+      mmdebstrap/1.5.7-3:
+        amd64:
+        - ALWAYSFAIL
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/amd64/m/mmdebstrap/20260420_120947_fda24@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/m/mmdebstrap/resolute/amd64
+        - null
+        - null
+        arm64:
+        - ALWAYSFAIL
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/arm64/m/mmdebstrap/20260420_114237_dd924@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/m/mmdebstrap/resolute/arm64
+        - null
+        - null
+        armhf:
+        - ALWAYSFAIL
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/armhf/m/mmdebstrap/20260420_114238_67745@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/m/mmdebstrap/resolute/armhf
+        - null
+        - null
+        i386:
+        - ALWAYSFAIL
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/i386/m/mmdebstrap/20260420_120224_0a12d@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/m/mmdebstrap/resolute/i386
+        - null
+        - null
+        ppc64el:
+        - ALWAYSFAIL
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/ppc64el/m/mmdebstrap/20260420_114317_a2875@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/m/mmdebstrap/resolute/ppc64el
+        - null
+        - null
+        s390x:
+        - ALWAYSFAIL
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/s390x/m/mmdebstrap/20260420_114210_85b9e@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/m/mmdebstrap/resolute/s390x
+        - null
+        - null
+      pymoc/0.5.2-3:
+        amd64:
+        - PASS
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/amd64/p/pymoc/20260420_120457_3116c@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/p/pymoc/resolute/amd64
+        - null
+        - null
+        arm64:
+        - PASS
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/arm64/p/pymoc/20260420_114526_8a862@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/p/pymoc/resolute/arm64
+        - null
+        - null
+        armhf:
+        - PASS
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/armhf/p/pymoc/20260420_114616_a06e6@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/p/pymoc/resolute/armhf
+        - null
+        - null
+        i386:
+        - PASS
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/i386/p/pymoc/20260420_114609_0f4d3@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/p/pymoc/resolute/i386
+        - null
+        - null
+        ppc64el:
+        - PASS
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/ppc64el/p/pymoc/20260420_114750_63d00@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/p/pymoc/resolute/ppc64el
+        - null
+        - null
+        s390x:
+        - PASS
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/s390x/p/pymoc/20260420_114404_cb026@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/p/pymoc/resolute/s390x
+        - null
+        - null
+      s-nail/14.9.25-1:
+        amd64:
+        - PASS
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/amd64/s/s-nail/20260420_114313_6ccf2@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/s/s-nail/resolute/amd64
+        - null
+        - null
+        arm64:
+        - PASS
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/arm64/s/s-nail/20260420_114248_b785c@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/s/s-nail/resolute/arm64
+        - null
+        - null
+        armhf:
+        - PASS
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/armhf/s/s-nail/20260420_114258_3cc99@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/s/s-nail/resolute/armhf
+        - null
+        - null
+        ppc64el:
+        - PASS
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/ppc64el/s/s-nail/20260420_114338_418dc@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/s/s-nail/resolute/ppc64el
+        - null
+        - null
+        s390x:
+        - PASS
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/s390x/s/s-nail/20260420_114149_a7f5e@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/s/s-nail/resolute/s390x
+        - null
+        - null
+      update-motd/3.12build1:
+        amd64:
+        - PASS
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/amd64/u/update-motd/20260420_114345_07f19@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/u/update-motd/resolute/amd64
+        - null
+        - null
+        arm64:
+        - PASS
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/arm64/u/update-motd/20260420_114245_e9dc4@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/u/update-motd/resolute/arm64
+        - null
+        - null
+        armhf:
+        - PASS
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/armhf/u/update-motd/20260420_114322_faacf@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/u/update-motd/resolute/armhf
+        - null
+        - null
+        i386:
+        - PASS
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/i386/u/update-motd/20260420_114310_8f580@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/u/update-motd/resolute/i386
+        - null
+        - null
+        ppc64el:
+        - PASS
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/ppc64el/u/update-motd/20260420_114332_ebd85@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/u/update-motd/resolute/ppc64el
+        - null
+        - null
+        s390x:
+        - PASS
+        - https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/s390x/u/update-motd/20260420_114146_e6ea2@/log.gz
+        - https://autopkgtest.ubuntu.com/packages/u/update-motd/resolute/s390x
+        - null
+        - null
+      verdict: REJECTED_TEMPORARILY
+    block:
+      verdict: PASS
+    block-bugs:
+      verdict: PASS
+    depends:
+      verdict: PASS
+    email:
+      verdict: PASS
+    rc-bugs:
+      shared-bugs: []
+      unique-source-bugs: []
+      unique-target-bugs: []
+      verdict: PASS
+    source-ppa:
+      verdict: PASS
+    update-excuse:
+      verdict: PASS
+  reason:
+  - autopkgtest
+  source: base-files
