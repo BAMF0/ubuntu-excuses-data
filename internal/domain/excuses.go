@@ -134,7 +134,8 @@ type UpdateExcusePolicy struct {
 }
 
 // Builder constructs an Excuses incrementally, interning repeated strings as
-// sources are added. Call Build to obtain the final immutable Excuses.
+// sources are added. Call Build to obtain the final Excuses value, which
+// callers should treat as read-only by convention and not modify.
 type Builder struct {
 	e           Excuses
 	components  internTable[ComponentID]
