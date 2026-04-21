@@ -20,7 +20,7 @@ func toSource(b *domain.Builder, s *yaml.Source) *domain.Source {
 		ComponentID:        b.InternComponent(s.Component),
 		MaintainerID:       b.InternMaintainer(s.Maintainer),
 		VerdictID:          b.InternVerdict(s.MigrationPolicyVerdict),
-		Excuses:            s.Excuses,
+		Excuses:            copySlice(s.Excuses),
 		Hints:              toHints(s.Hints),
 		InvalidatedByOther: s.InvalidatedByOtherPackage,
 		IsCandidate:        s.IsCandidate,
@@ -28,13 +28,13 @@ func toSource(b *domain.Builder, s *yaml.Source) *domain.Source {
 		NewVersion:         s.NewVersion,
 		OldVersion:         s.OldVersion,
 		PolicyInfo:         toPolicyInfo(b, s.PolicyInfo),
-		Reason:             s.Reason,
+		Reason:             copySlice(s.Reason),
 		SourcePackage:      s.SourcePackage,
 	}
 	if s.Dependencies != nil {
 		ds.Dependencies = &domain.Dependencies{
-			BlockedBy:    s.Dependencies.BlockedBy,
-			MigrateAfter: s.Dependencies.MigrateAfter,
+			BlockedBy:    copySlice(s.Dependencies.BlockedBy),
+			MigrateAfter: copySlice(s.Dependencies.MigrateAfter),
 		}
 	}
 	return ds
@@ -64,15 +64,15 @@ func toPolicyInfo(b *domain.Builder, p yaml.PolicyInfo) domain.PolicyInfo {
 		Depends:     p.Depends.Verdict,
 		Email:       p.Email.Verdict,
 		RcBugs: domain.RcBugsPolicy{
-			SharedBugs:       p.RcBugs.SharedBugs,
-			UniqueSourceBugs: p.RcBugs.UniqueSourceBugs,
-			UniqueTargetBugs: p.RcBugs.UniqueTargetBugs,
+			SharedBugs:       copySlice(p.RcBugs.SharedBugs),
+			UniqueSourceBugs: copySlice(p.RcBugs.UniqueSourceBugs),
+			UniqueTargetBugs: copySlice(p.RcBugs.UniqueTargetBugs),
 			Verdict:          p.RcBugs.Verdict,
 		},
 		SourcePPA: p.SourcePPA.Verdict,
 		UpdateExcuse: domain.UpdateExcusePolicy{
 			Verdict: p.UpdateExcuse.Verdict,
-			Bugs:    p.UpdateExcuse.Bugs,
+			Bugs:    copyMap(p.UpdateExcuse.Bugs),
 		},
 	}
 	if p.Linux != nil {
@@ -92,11 +92,45 @@ func toAutopkgtestPolicy(b *domain.Builder, a yaml.AutopkgtestPolicy) domain.Aut
 		for arch, res := range arches {
 			archMap[b.InternArch(arch)] = domain.AutopkgtestResult{
 				StatusID: b.InternStatus(res.Status),
-				LogURL:   res.LogURL,
-				PkgURL:   res.PkgURL,
+				LogURL:   copyPtr(res.LogURL),
+				PkgURL:   copyPtr(res.PkgURL),
 			}
 		}
 		dp.Packages[pkg] = archMap
 	}
 	return dp
+}
+
+// copySlice returns a shallow copy of s with its own backing array,
+// breaking any reference to the original. Returns nil for nil/empty input.
+func copySlice[T any](s []T) []T {
+	if len(s) == 0 {
+		return nil
+	}
+	out := make([]T, len(s))
+	copy(out, s)
+	return out
+}
+
+// copyMap returns a shallow copy of m, breaking any reference to the original.
+// Returns nil for nil/empty input.
+func copyMap[K comparable, V any](m map[K]V) map[K]V {
+	if len(m) == 0 {
+		return nil
+	}
+	out := make(map[K]V, len(m))
+	for k, v := range m {
+		out[k] = v
+	}
+	return out
+}
+
+// copyPtr returns a pointer to a copy of the value pointed to by p,
+// breaking any reference to the original. Returns nil for nil input.
+func copyPtr[T any](p *T) *T {
+	if p == nil {
+		return nil
+	}
+	v := *p
+	return &v
 }
