@@ -1,0 +1,34 @@
+generated-date: 2026-01-01 00:00:00
+sources:
+- source: some-package
+  item-name: some-package
+  new-version: 1.0-2
+  old-version: 1.0-1
+  maintainer: Test Developer
+  migration-policy-verdict: REJECTED_PERMANENTLY
+  is-candidate: false
+  policy_info:
+    age:
+      age-requirement: 5
+      current-age: 1.0
+      verdict: REJECTED
+    autopkgtest:
+      verdict: PASS
+    block:
+      verdict: PASS
+    block-bugs:
+      verdict: PASS
+    depends:
+      verdict: PASS
+    email:
+      verdict: PASS
+    rc-bugs:
+      shared-bugs: []
+      unique-source-bugs: []
+      unique-target-bugs: []
+      verdict: PASS
+    source-ppa:
+      verdict: PASS
+    update-excuse:
+      verdict: REJECTED_PERMANENTLY
+      "2142117": 1771420300
