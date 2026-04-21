@@ -42,14 +42,17 @@ func (a *AutopkgtestPolicy) UnmarshalYAML(unmarshal func(any) error) error {
 
 		archMap, ok := val.(map[string]any)
 		if !ok {
-			continue
+			return fmt.Errorf("autopkgtest package %q: expected map of architectures, got %T", key, val)
 		}
 
 		pkgResults := make(map[string]AutopkgtestResult)
 		for arch, archVal := range archMap {
 			items, ok := archVal.([]any)
-			if !ok || len(items) < 3 {
-				continue
+			if !ok {
+				return fmt.Errorf("autopkgtest package %q arch %q: expected sequence, got %T", key, arch, archVal)
+			}
+			if len(items) < 3 {
+				return fmt.Errorf("autopkgtest package %q arch %q: expected at least 3 values, got %d", key, arch, len(items))
 			}
 			var result AutopkgtestResult
 			if s, ok := items[0].(string); ok {
