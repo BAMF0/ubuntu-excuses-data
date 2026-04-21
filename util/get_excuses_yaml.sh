@@ -1,4 +1,4 @@
-#! /usr/bin/env bash
+#!/usr/bin/env bash
 # Fetch the Ubuntu excuses YAML file from the proposed migration path.
 set -euo pipefail
 
