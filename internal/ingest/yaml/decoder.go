@@ -7,8 +7,8 @@ import (
 	"github.com/goccy/go-yaml"
 )
 
-// ReadExcusesYaml decodes update_excuses.yaml from r into an ExcusesFile.
-func ReadExcusesYaml(r io.Reader) (*ExcusesFile, error) {
+// ReadExcusesYAML decodes update_excuses.yaml from r into an ExcusesFile.
+func ReadExcusesYAML(r io.Reader) (*ExcusesFile, error) {
 	var excuses ExcusesFile
 	if err := yaml.NewDecoder(r).Decode(&excuses); err != nil {
 		return nil, err

@@ -16,7 +16,7 @@ var updateExcuseBugsYAML []byte
 // mustDecode decodes YAML data and fails the test immediately on error.
 func mustDecode(t *testing.T, data []byte) *ExcusesFile {
 	t.Helper()
-	f, err := ReadExcusesYaml(bytes.NewReader(data))
+	f, err := ReadExcusesYAML(bytes.NewReader(data))
 	if err != nil {
 		t.Fatalf("ReadExcusesYaml: %v", err)
 	}
