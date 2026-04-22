@@ -51,6 +51,7 @@ func (h *Handler) ListSources(w http.ResponseWriter, r *http.Request) {
 	sortOrder := ParseSortOrder(r)
 
 	sources := h.filteredSources(filters)
+	sources = append([]*domain.Source(nil), sources...)
 	sortSources(sources, sortOrder)
 
 	total := len(sources)
