@@ -54,6 +54,9 @@ func testExcuses() *domain.Excuses {
 			Status: domain.StatusBlocked,
 			Detail: "introduces a regression",
 		},
+		PolicyInfo: domain.PolicyInfo{
+			Age: domain.AgePolicy{AgeRequirement: 10, CurrentAge: 7, Verdict: "PASS"},
+		},
 	})
 	b.Add(&domain.Source{
 		SourcePackage: "vim",
@@ -66,6 +69,9 @@ func testExcuses() *domain.Excuses {
 		NewVersion:    "9.1-1",
 		Excuse: domain.Excuse{
 			Status: domain.StatusWaiting,
+		},
+		PolicyInfo: domain.PolicyInfo{
+			Age: domain.AgePolicy{AgeRequirement: 5, CurrentAge: 1, Verdict: "REJECTED_TEMPORARILY"},
 		},
 	})
 	return b.Build(time.Date(2025, 4, 20, 12, 0, 0, 0, time.UTC))
@@ -429,5 +435,131 @@ func TestListSources_CombinedFilters(t *testing.T) {
 	}
 	if list.Sources[0].SourcePackage != "bash" {
 		t.Errorf("source = %q, want bash", list.Sources[0].SourcePackage)
+	}
+}
+
+func TestListSources_SortByAge(t *testing.T) {
+	srv := newTestServer(testExcuses())
+	defer srv.Close()
+
+	// Ages: vim=1, bash=3, zlib=7 → ascending by age.
+	resp, err := http.Get(srv.URL + "/sources?sort=age")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	var list SourceListResponse
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		t.Fatal(err)
+	}
+	if list.Sort != "age" {
+		t.Errorf("Sort = %q, want age", list.Sort)
+	}
+	if list.Order != "asc" {
+		t.Errorf("Order = %q, want asc", list.Order)
+	}
+	if len(list.Sources) != 3 {
+		t.Fatalf("len(Sources) = %d, want 3", len(list.Sources))
+	}
+	want := []string{"vim", "bash", "zlib"}
+	for i, w := range want {
+		if list.Sources[i].SourcePackage != w {
+			t.Errorf("Sources[%d] = %q, want %q", i, list.Sources[i].SourcePackage, w)
+		}
+	}
+}
+
+func TestListSources_SortByAgeDesc(t *testing.T) {
+	srv := newTestServer(testExcuses())
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/sources?sort=age&order=desc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	var list SourceListResponse
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		t.Fatal(err)
+	}
+	if list.Sort != "age" {
+		t.Errorf("Sort = %q, want age", list.Sort)
+	}
+	if list.Order != "desc" {
+		t.Errorf("Order = %q, want desc", list.Order)
+	}
+	if len(list.Sources) != 3 {
+		t.Fatalf("len(Sources) = %d, want 3", len(list.Sources))
+	}
+	want := []string{"zlib", "bash", "vim"}
+	for i, w := range want {
+		if list.Sources[i].SourcePackage != w {
+			t.Errorf("Sources[%d] = %q, want %q", i, list.Sources[i].SourcePackage, w)
+		}
+	}
+}
+
+func TestListSources_SortByNameDesc(t *testing.T) {
+	srv := newTestServer(testExcuses())
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/sources?sort=name&order=desc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	var list SourceListResponse
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		t.Fatal(err)
+	}
+	if len(list.Sources) != 3 {
+		t.Fatalf("len(Sources) = %d, want 3", len(list.Sources))
+	}
+	want := []string{"zlib", "vim", "bash"}
+	for i, w := range want {
+		if list.Sources[i].SourcePackage != w {
+			t.Errorf("Sources[%d] = %q, want %q", i, list.Sources[i].SourcePackage, w)
+		}
+	}
+}
+
+func TestListSources_DefaultSortInResponse(t *testing.T) {
+	srv := newTestServer(testExcuses())
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/sources")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	var list SourceListResponse
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		t.Fatal(err)
+	}
+	if list.Sort != "name" {
+		t.Errorf("Sort = %q, want name", list.Sort)
+	}
+	if list.Order != "asc" {
+		t.Errorf("Order = %q, want asc", list.Order)
 	}
 }

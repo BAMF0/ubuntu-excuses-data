@@ -22,6 +22,8 @@ type SourceListResponse struct {
 	Total         int              `json:"total"`
 	Offset        int              `json:"offset"`
 	Limit         int              `json:"limit"`
+	Sort          string           `json:"sort"`
+	Order         string           `json:"order"`
 	Sources       []SourceResponse `json:"sources"`
 }
 

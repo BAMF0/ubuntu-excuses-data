@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -61,4 +62,68 @@ func ParseSourceFilters(r *http.Request) SourceFilters {
 // IsEmpty returns true if no filters are set.
 func (f SourceFilters) IsEmpty() bool {
 	return f.Component == "" && f.Verdict == "" && f.Maintainer == "" && f.MigrationStatus == ""
+}
+
+// SortField identifies which field to sort sources by.
+type SortField int
+
+const (
+	SortByName SortField = iota
+	SortByAge
+)
+
+// SortDirection controls ascending vs descending order.
+type SortDirection int
+
+const (
+	SortAsc SortDirection = iota
+	SortDesc
+)
+
+// SortOrder holds the validated sort field and direction.
+type SortOrder struct {
+	Field     SortField
+	Direction SortDirection
+}
+
+// String returns the canonical name for a SortField.
+func (f SortField) String() string {
+	switch f {
+	case SortByAge:
+		return "age"
+	default:
+		return "name"
+	}
+}
+
+// String returns the canonical name for a SortDirection.
+func (d SortDirection) String() string {
+	switch d {
+	case SortDesc:
+		return "desc"
+	default:
+		return "asc"
+	}
+}
+
+// ParseSortOrder extracts sort and order query parameters.
+// Supported sort values: "name" (default), "age".
+// Supported order values: "asc" (default), "desc".
+func ParseSortOrder(r *http.Request) SortOrder {
+	s := SortOrder{
+		Field:     SortByName,
+		Direction: SortAsc,
+	}
+
+	switch strings.ToLower(r.URL.Query().Get("sort")) {
+	case "age":
+		s.Field = SortByAge
+	}
+
+	switch strings.ToLower(r.URL.Query().Get("order")) {
+	case "desc":
+		s.Direction = SortDesc
+	}
+
+	return s
 }

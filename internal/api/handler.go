@@ -24,12 +24,14 @@ func (h *Handler) GetMeta(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, NewMetaResponse(h.excuses))
 }
 
-// ListSources returns a paginated, optionally filtered list of sources.
+// ListSources returns a paginated, optionally filtered and sorted list of sources.
 func (h *Handler) ListSources(w http.ResponseWriter, r *http.Request) {
 	filters := ParseSourceFilters(r)
 	page := ParsePagination(r)
+	sortOrder := ParseSortOrder(r)
 
 	sources := h.filteredSources(filters)
+	sortSources(sources, sortOrder)
 
 	total := len(sources)
 	start, end := clampRange(page.Offset, page.Limit, total)
@@ -44,6 +46,8 @@ func (h *Handler) ListSources(w http.ResponseWriter, r *http.Request) {
 		Total:         total,
 		Offset:        page.Offset,
 		Limit:         page.Limit,
+		Sort:          sortOrder.Field.String(),
+		Order:         sortOrder.Direction.String(),
 		Sources:       items,
 	})
 }
@@ -132,6 +136,30 @@ func (h *Handler) allSourcesSorted() []*domain.Source {
 		return sources[i].SourcePackage < sources[j].SourcePackage
 	})
 	return sources
+}
+
+// sortSources sorts sources in-place according to the given SortOrder.
+// A secondary sort by name is applied for deterministic ordering when primary
+// values are equal.
+func sortSources(sources []*domain.Source, o SortOrder) {
+	sort.Slice(sources, func(i, j int) bool {
+		var less bool
+		switch o.Field {
+		case SortByAge:
+			ai, aj := sources[i].PolicyInfo.Age.CurrentAge, sources[j].PolicyInfo.Age.CurrentAge
+			if ai != aj {
+				less = ai < aj
+			} else {
+				less = sources[i].SourcePackage < sources[j].SourcePackage
+			}
+		default: // SortByName
+			less = sources[i].SourcePackage < sources[j].SourcePackage
+		}
+		if o.Direction == SortDesc {
+			return !less
+		}
+		return less
+	})
 }
 
 // clampRange returns a valid [start, end) range within [0, total).
