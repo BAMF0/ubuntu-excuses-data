@@ -169,22 +169,25 @@ func (h *Handler) computeSortedSources() []*domain.Source {
 // values are equal.
 func sortSources(sources []*domain.Source, o SortOrder) {
 	sort.Slice(sources, func(i, j int) bool {
-		var less bool
 		switch o.Field {
 		case SortByAge:
 			ai, aj := sources[i].PolicyInfo.Age.CurrentAge, sources[j].PolicyInfo.Age.CurrentAge
 			if ai != aj {
-				less = ai < aj
-			} else {
-				less = sources[i].SourcePackage < sources[j].SourcePackage
+				if o.Direction == SortDesc {
+					return ai > aj
+				}
+				return ai < aj
 			}
+			if o.Direction == SortDesc {
+				return sources[i].SourcePackage > sources[j].SourcePackage
+			}
+			return sources[i].SourcePackage < sources[j].SourcePackage
 		default: // SortByName
-			less = sources[i].SourcePackage < sources[j].SourcePackage
+			if o.Direction == SortDesc {
+				return sources[i].SourcePackage > sources[j].SourcePackage
+			}
+			return sources[i].SourcePackage < sources[j].SourcePackage
 		}
-		if o.Direction == SortDesc {
-			return !less
-		}
-		return less
 	})
 }
 
