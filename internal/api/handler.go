@@ -209,7 +209,7 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	data, err := json.Marshal(v)
 	if err != nil {
 		log.Printf("writeJSON: marshal failed: %v", err)
-		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+		writeRawJSON(w, http.StatusInternalServerError, []byte(`{"error":"internal server error"}`))
 		return
 	}
 	writeRawJSON(w, status, data)
