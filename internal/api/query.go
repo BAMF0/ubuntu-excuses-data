@@ -107,17 +107,17 @@ func (d SortDirection) String() string {
 }
 
 // ParseSortOrder extracts sort and order query parameters.
-// Supported sort values: "name" (default), "age".
+// Supported sort values: "age" (default), "name".
 // Supported order values: "asc" (default), "desc".
 func ParseSortOrder(r *http.Request) SortOrder {
 	s := SortOrder{
-		Field:     SortByName,
+		Field:     SortByAge,
 		Direction: SortAsc,
 	}
 
 	switch strings.ToLower(r.URL.Query().Get("sort")) {
-	case "age":
-		s.Field = SortByAge
+	case "name":
+		s.Field = SortByName
 	}
 
 	switch strings.ToLower(r.URL.Query().Get("order")) {

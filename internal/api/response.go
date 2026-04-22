@@ -1,6 +1,8 @@
 package api
 
 import (
+	"strings"
+
 	"github.com/BAMF0/ubuntu-excuses-data/internal/domain"
 )
 
@@ -117,7 +119,7 @@ type UpdateExcusePolicyResponse struct {
 func NewMetaResponse(e *domain.Excuses) MetaResponse {
 	return MetaResponse{
 		GeneratedDate:   e.GeneratedDate.UTC().Format("2006-01-02T15:04:05Z"),
-		TotalSources:    len(e.ByName),
+		TotalSources:    len(e.Sources),
 		TotalCandidates: len(e.Candidates),
 		Components:      e.Components,
 		Verdicts:        e.Verdicts,
@@ -150,7 +152,7 @@ func NewSourceResponse(e *domain.Excuses, s *domain.Source) SourceResponse {
 		Hints:      newHintResponses(s.Hints),
 		Reason:     s.Reason,
 	}
-	if s.Dependencies != nil {
+	if s.Dependencies.HasAny() {
 		r.Dependencies = &DependencyResponse{
 			BlockedBy:    s.Dependencies.BlockedBy,
 			MigrateAfter: s.Dependencies.MigrateAfter,
@@ -191,14 +193,27 @@ func newAutopkgtestPolicyResponse(e *domain.Excuses, a *domain.AutopkgtestPolicy
 		Verdict:  a.Verdict,
 		Packages: make(map[string]map[string]AutopkgtestResultResponse, len(a.Packages)),
 	}
-	for pkg, arches := range a.Packages {
-		archMap := make(map[string]AutopkgtestResultResponse, len(arches))
-		for archID, res := range arches {
-			archMap[e.Arches[archID]] = AutopkgtestResultResponse{
-				Status: e.Statuses[res.StatusID],
-				LogURL: res.LogURL,
-				PkgURL: res.PkgURL,
+	for pkg, archResults := range a.Packages {
+		// Extract the source package name from the "pkg/version" key.
+		pkgName := pkg
+		if i := strings.Index(pkg, "/"); i > 0 {
+			pkgName = pkg[:i]
+		}
+
+		archMap := make(map[string]AutopkgtestResultResponse, len(archResults))
+		for _, ar := range archResults {
+			arch := e.Arches[ar.ArchID]
+			resp := AutopkgtestResultResponse{
+				Status: e.Statuses[ar.Result.StatusID],
 			}
+			if logURL := e.LogURL(pkgName, arch, &ar.Result); logURL != "" {
+				resp.LogURL = &logURL
+			}
+			if e.Release != "" {
+				pkgURL := e.PkgURL(pkgName, arch)
+				resp.PkgURL = &pkgURL
+			}
+			archMap[arch] = resp
 		}
 		r.Packages[pkg] = archMap
 	}

@@ -1,9 +1,13 @@
 package ingest
 
 import (
+	"bytes"
+	_ "embed"
+	"strings"
 	"testing"
 
 	"github.com/BAMF0/ubuntu-excuses-data/internal/domain"
+	yaml "github.com/BAMF0/ubuntu-excuses-data/internal/ingest/yaml"
 )
 
 func TestToExcuse(t *testing.T) {
@@ -73,3 +77,106 @@ func TestToExcuse(t *testing.T) {
 		})
 	}
 }
+
+//go:embed yaml/testdata/base-files_excuses.yaml
+var baseFilesYAML []byte
+
+func TestParseLogURL(t *testing.T) {
+	tests := []struct {
+		name     string
+		url      *string
+		wantRun  string
+		wantAuth string
+	}{
+		{"nil", nil, "", ""},
+		{"normal", strPtr("https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/amd64/b/bash/20260420_114305_a5f93@/log.gz"), "20260420_114305_a5f93", "AUTH_0f9aae918d5b4744bf7b827671c86842"},
+		{"different_auth", strPtr("https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_abc123/autopkgtest-resolute/resolute/amd64/b/bash/20260420_114305_a5f93@/log.gz"), "20260420_114305_a5f93", "AUTH_abc123"},
+		{"run_without_auth", strPtr("https://example.com/autopkgtest-resolute/resolute/amd64/b/bash/20260420_114305_a5f93@/log.gz"), "20260420_114305_a5f93", ""},
+		{"no_match", strPtr("https://autopkgtest.ubuntu.com/running"), "", ""},
+		{"empty", strPtr(""), "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotRun, gotAuth := parseLogURL(tt.url)
+			if gotRun != tt.wantRun {
+				t.Errorf("runID = %q, want %q", gotRun, tt.wantRun)
+			}
+			if gotAuth != tt.wantAuth {
+				t.Errorf("auth = %q, want %q", gotAuth, tt.wantAuth)
+			}
+		})
+	}
+}
+
+func TestDetectRelease(t *testing.T) {
+	f, err := yaml.ReadExcusesYAML(bytes.NewReader(baseFilesYAML))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := detectRelease(f)
+	if got != "resolute" {
+		t.Errorf("detectRelease() = %q, want %q", got, "resolute")
+	}
+}
+
+func TestURLRoundTrip(t *testing.T) {
+	f, err := yaml.ReadExcusesYAML(bytes.NewReader(baseFilesYAML))
+	if err != nil {
+		t.Fatal(err)
+	}
+	excuses := ToExcuses(f)
+
+	if excuses.Release != "resolute" {
+		t.Fatalf("Release = %q, want %q", excuses.Release, "resolute")
+	}
+
+	// Walk all autopkgtest results and verify that reconstructed URLs match
+	// the original YAML URLs for entries with normal log URLs.
+	src := f.Sources[0]
+	domSrc := excuses.SourceByName(src.SourcePackage)
+	if domSrc == nil {
+		t.Fatal("source not found in domain model")
+	}
+
+	for pkgVer, yamlArches := range src.PolicyInfo.Autopkgtest.Packages {
+		pkgName := pkgVer
+		if i := strings.Index(pkgVer, "/"); i > 0 {
+			pkgName = pkgVer[:i]
+		}
+		domArches, ok := domSrc.PolicyInfo.Autopkgtest.Packages[pkgVer]
+		if !ok {
+			t.Errorf("missing package %q in domain model", pkgVer)
+			continue
+		}
+		for archName, yamlRes := range yamlArches {
+			archID, ok := excuses.ArchIDs[archName]
+			if !ok {
+				t.Errorf("unknown arch %q", archName)
+				continue
+			}
+			domRes, ok := domArches.Find(archID)
+			if !ok {
+				t.Errorf("missing arch %q for %q", archName, pkgVer)
+				continue
+			}
+
+			// Verify PkgURL reconstruction.
+			if yamlRes.PkgURL != nil {
+				got := excuses.PkgURL(pkgName, archName)
+				if got != *yamlRes.PkgURL {
+					t.Errorf("PkgURL(%q, %q) = %q, want %q", pkgName, archName, got, *yamlRes.PkgURL)
+				}
+			}
+
+			// Verify LogURL reconstruction for normal log URLs (skip non-standard ones like /running).
+			if yamlRes.LogURL != nil && strings.Contains(*yamlRes.LogURL, "@/log.gz") {
+				got := excuses.LogURL(pkgName, archName, &domRes)
+				if got != *yamlRes.LogURL {
+					t.Errorf("LogURL(%q, %q) = %q, want %q", pkgName, archName, got, *yamlRes.LogURL)
+				}
+			}
+		}
+	}
+}
+
+func strPtr(s string) *string { return &s }

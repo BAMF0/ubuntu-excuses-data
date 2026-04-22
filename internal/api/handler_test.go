@@ -13,7 +13,7 @@ import (
 // testExcuses builds a small Excuses dataset for handler tests.
 func testExcuses() *domain.Excuses {
 	b := domain.NewBuilder(4)
-	b.Add(&domain.Source{
+	b.Add(domain.Source{
 		SourcePackage: "bash",
 		ComponentID:   b.InternComponent("main"),
 		MaintainerID:  b.InternMaintainer("ubuntu-devel@lists.ubuntu.com"),
@@ -31,17 +31,17 @@ func testExcuses() *domain.Excuses {
 			Age: domain.AgePolicy{AgeRequirement: 5, CurrentAge: 3, Verdict: "PASS"},
 			Autopkgtest: domain.AutopkgtestPolicy{
 				Verdict: "PASS",
-				Packages: map[string]map[domain.ArchID]domain.AutopkgtestResult{
+				Packages: map[string]domain.ArchResults{
 					"bash/5.3-1": {
-						b.InternArch("amd64"): {
+						{ArchID: b.InternArch("amd64"), Result: domain.AutopkgtestResult{
 							StatusID: b.InternStatus("PASS"),
-						},
+						}},
 					},
 				},
 			},
 		},
 	})
-	b.Add(&domain.Source{
+	b.Add(domain.Source{
 		SourcePackage: "zlib",
 		ComponentID:   b.InternComponent("main"),
 		MaintainerID:  b.InternMaintainer("ubuntu-devel@lists.ubuntu.com"),
@@ -58,7 +58,7 @@ func testExcuses() *domain.Excuses {
 			Age: domain.AgePolicy{AgeRequirement: 10, CurrentAge: 7, Verdict: "PASS"},
 		},
 	})
-	b.Add(&domain.Source{
+	b.Add(domain.Source{
 		SourcePackage: "vim",
 		ComponentID:   b.InternComponent("universe"),
 		MaintainerID:  b.InternMaintainer("pkg-vim@lists.alioth.debian.org"),
@@ -140,9 +140,9 @@ func TestListSources_All(t *testing.T) {
 	if len(list.Sources) != 3 {
 		t.Errorf("len(Sources) = %d, want 3", len(list.Sources))
 	}
-	// Verify alphabetical order.
-	if list.Sources[0].SourcePackage != "bash" {
-		t.Errorf("first source = %q, want bash", list.Sources[0].SourcePackage)
+	// Default sort is age ascending: vim=1, bash=3, zlib=7.
+	if list.Sources[0].SourcePackage != "vim" {
+		t.Errorf("first source = %q, want vim", list.Sources[0].SourcePackage)
 	}
 	if list.Sources[2].SourcePackage != "zlib" {
 		t.Errorf("last source = %q, want zlib", list.Sources[2].SourcePackage)
@@ -173,8 +173,9 @@ func TestListSources_Pagination(t *testing.T) {
 	if len(list.Sources) != 1 {
 		t.Fatalf("len(Sources) = %d, want 1", len(list.Sources))
 	}
-	if list.Sources[0].SourcePackage != "vim" {
-		t.Errorf("source = %q, want vim (alphabetical index 1)", list.Sources[0].SourcePackage)
+	// Default sort is age asc: vim=1, bash=3, zlib=7 → index 1 is bash.
+	if list.Sources[0].SourcePackage != "bash" {
+		t.Errorf("source = %q, want bash (age-sorted index 1)", list.Sources[0].SourcePackage)
 	}
 }
 
@@ -556,8 +557,8 @@ func TestListSources_DefaultSortInResponse(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
 		t.Fatal(err)
 	}
-	if list.Sort != "name" {
-		t.Errorf("Sort = %q, want name", list.Sort)
+	if list.Sort != "age" {
+		t.Errorf("Sort = %q, want age", list.Sort)
 	}
 	if list.Order != "asc" {
 		t.Errorf("Order = %q, want asc", list.Order)

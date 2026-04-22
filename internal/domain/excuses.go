@@ -1,6 +1,10 @@
 package domain
 
-import "time"
+import (
+	"fmt"
+	"strings"
+	"time"
+)
 
 // ID types for interned string categories.
 // Using distinct named types prevents accidentally mixing up IDs at compile time.
@@ -9,8 +13,17 @@ type VerdictID int
 type MaintainerID int
 type StatusID int
 type ArchID int
+type SwiftAuthID int
+
+// SourceIdx is an index into Excuses.Sources, used by all secondary indexes
+// to avoid pointer indirection and keep iteration cache-friendly.
+type SourceIdx int
 
 // Excuses is the high-performance domain model of update_excuses.yaml.
+//
+// All Source values live in a single contiguous slice (Sources); every index
+// and lookup table references them by SourceIdx rather than pointer, so
+// filtered scans and sorts walk sequential memory.
 //
 // Categorical strings that recur across thousands of entries (component, verdict,
 // maintainer, autopkgtest status, architecture) are stored exactly once in intern
@@ -21,12 +34,20 @@ type ArchID int
 type Excuses struct {
 	GeneratedDate time.Time
 
+	// Release is the Ubuntu release codename (e.g. "resolute"), extracted
+	// from autopkgtest URLs during ingest. Used to reconstruct full URLs.
+	Release string
+
+	// Sources is the contiguous backing store for all source entries.
+	Sources []Source
+
 	// Intern tables: ID → canonical string value, O(1) lookup by ID.
 	Components  []string // indexed by ComponentID
 	Verdicts    []string // indexed by VerdictID
 	Maintainers []string // indexed by MaintainerID
-	Statuses    []string // indexed by StatusID  (e.g. "PASS", "REGRESSION")
-	Arches      []string // indexed by ArchID    (e.g. "amd64", "arm64")
+	Statuses    []string // indexed by StatusID      (e.g. "PASS", "REGRESSION")
+	Arches      []string // indexed by ArchID        (e.g. "amd64", "arm64")
+	SwiftAuths  []string // indexed by SwiftAuthID   (e.g. "AUTH_0f9aae918d5b4744bf7b827671c86842")
 
 	// Reverse intern tables: canonical string → ID, O(1) lookup by name.
 	ComponentIDs  map[string]ComponentID
@@ -34,17 +55,28 @@ type Excuses struct {
 	MaintainerIDs map[string]MaintainerID
 	StatusIDs     map[string]StatusID
 	ArchIDs       map[string]ArchID
+	SwiftAuthIDs  map[string]SwiftAuthID
 
 	// ByName provides O(1) lookup of any source by its package name.
-	ByName map[string]*Source
+	ByName map[string]SourceIdx
 
 	// Secondary index maps for O(1) filtered queries, keyed by interned ID.
-	ByComponent  map[ComponentID][]*Source
-	ByVerdict    map[VerdictID][]*Source
-	ByMaintainer map[MaintainerID][]*Source
+	ByComponent  map[ComponentID][]SourceIdx
+	ByVerdict    map[VerdictID][]SourceIdx
+	ByMaintainer map[MaintainerID][]SourceIdx
 
 	// Candidates is pre-filtered: sources where IsCandidate == true.
-	Candidates []*Source
+	Candidates []SourceIdx
+}
+
+// SourceByName returns a pointer to the Source with the given package name,
+// or nil if not found. The pointer is valid for the lifetime of the Excuses.
+func (e *Excuses) SourceByName(name string) *Source {
+	idx, ok := e.ByName[name]
+	if !ok {
+		return nil
+	}
+	return &e.Sources[idx]
 }
 
 // MigrationStatus represents the high-level migration state of a source package.
@@ -92,7 +124,7 @@ type Source struct {
 	MaintainerID MaintainerID
 	VerdictID    VerdictID
 
-	Dependencies       *Dependencies
+	Dependencies       Dependencies
 	Excuse             Excuse
 	Hints              []Hint
 	InvalidatedByOther bool
@@ -106,9 +138,15 @@ type Source struct {
 }
 
 // Dependencies lists packages this source must wait for or is blocked by.
+// Embedded as a value in Source to avoid a separate heap allocation.
 type Dependencies struct {
 	BlockedBy    []string
 	MigrateAfter []string
+}
+
+// HasAny returns true if any dependency is set.
+func (d *Dependencies) HasAny() bool {
+	return len(d.BlockedBy) > 0 || len(d.MigrateAfter) > 0
 }
 
 // Hint represents a migration hint (e.g. block, unblock) applied to a source.
@@ -139,19 +177,44 @@ type AgePolicy struct {
 }
 
 // AutopkgtestPolicy holds the overall verdict plus per-package/arch results.
-// Packages maps "source/version" → ArchID → AutopkgtestResult for O(1) arch-level
-// access. Arch keys and result statuses reference the parent Excuses intern tables.
+// Packages maps "source/version" → ArchResults, a flat slice of per-arch results.
+// Using a slice instead of a nested map avoids hash-table overhead for the small
+// number of architectures (typically 4–6) and keeps results contiguous in memory.
 type AutopkgtestPolicy struct {
 	Verdict  string
-	Packages map[string]map[ArchID]AutopkgtestResult
+	Packages map[string]ArchResults
+}
+
+// ArchResult pairs an architecture with its autopkgtest outcome.
+type ArchResult struct {
+	ArchID ArchID
+	Result AutopkgtestResult
+}
+
+// ArchResults is a flat slice of per-architecture results.
+// For the small number of architectures per package (typically 4–6), linear
+// scan outperforms map lookup due to cache locality and no hashing overhead.
+type ArchResults []ArchResult
+
+// Find returns the result for the given architecture, or false if not present.
+func (ar ArchResults) Find(id ArchID) (AutopkgtestResult, bool) {
+	for i := range ar {
+		if ar[i].ArchID == id {
+			return ar[i].Result, true
+		}
+	}
+	return AutopkgtestResult{}, false
 }
 
 // AutopkgtestResult holds the outcome for a single arch run.
 // StatusID references Excuses.Statuses for the canonical status string.
+// LogRunID is the unique run identifier extracted from the full log URL;
+// SwiftAuthID references the Swift AUTH token in Excuses.SwiftAuths;
+// together they allow on-demand reconstruction via Excuses.LogURL.
 type AutopkgtestResult struct {
-	StatusID StatusID
-	LogURL   *string
-	PkgURL   *string
+	StatusID    StatusID
+	SwiftAuthID SwiftAuthID
+	LogRunID    string // e.g. "20260420_114305_a5f93" (empty when no log available)
 }
 
 // RcBugsPolicy lists RC bugs shared or unique to the source/target.
@@ -179,22 +242,25 @@ type Builder struct {
 	maintainers internTable[MaintainerID]
 	statuses    internTable[StatusID]
 	arches      internTable[ArchID]
+	swiftAuths  internTable[SwiftAuthID]
 }
 
 // NewBuilder returns a ready-to-use Builder.
 func NewBuilder(capacity int) *Builder {
 	return &Builder{
 		e: Excuses{
-			ByName:       make(map[string]*Source, capacity),
-			ByComponent:  make(map[ComponentID][]*Source),
-			ByVerdict:    make(map[VerdictID][]*Source),
-			ByMaintainer: make(map[MaintainerID][]*Source),
+			Sources:      make([]Source, 0, capacity),
+			ByName:       make(map[string]SourceIdx, capacity),
+			ByComponent:  make(map[ComponentID][]SourceIdx),
+			ByVerdict:    make(map[VerdictID][]SourceIdx),
+			ByMaintainer: make(map[MaintainerID][]SourceIdx),
 		},
 		components:  newInternTable[ComponentID](),
 		verdicts:    newInternTable[VerdictID](),
 		maintainers: newInternTable[MaintainerID](),
 		statuses:    newInternTable[StatusID](),
 		arches:      newInternTable[ArchID](),
+		swiftAuths:  newInternTable[SwiftAuthID](),
 	}
 }
 
@@ -214,15 +280,21 @@ func (b *Builder) InternStatus(s string) StatusID { return b.statuses.intern(s) 
 // InternArch returns the ArchID for the given architecture string.
 func (b *Builder) InternArch(s string) ArchID { return b.arches.intern(s) }
 
-// Add registers a source in all indexes. The source's ComponentID, VerdictID,
-// and MaintainerID must have been obtained from this Builder's Intern* methods.
-func (b *Builder) Add(s *Source) {
-	b.e.ByName[s.SourcePackage] = s
-	b.e.ByComponent[s.ComponentID] = append(b.e.ByComponent[s.ComponentID], s)
-	b.e.ByVerdict[s.VerdictID] = append(b.e.ByVerdict[s.VerdictID], s)
-	b.e.ByMaintainer[s.MaintainerID] = append(b.e.ByMaintainer[s.MaintainerID], s)
+// InternSwiftAuth returns the SwiftAuthID for the given Swift AUTH token.
+func (b *Builder) InternSwiftAuth(s string) SwiftAuthID { return b.swiftAuths.intern(s) }
+
+// Add registers a source in the flat backing store and all indexes. The source's
+// ComponentID, VerdictID, and MaintainerID must have been obtained from this
+// Builder's Intern* methods.
+func (b *Builder) Add(s Source) {
+	idx := SourceIdx(len(b.e.Sources))
+	b.e.Sources = append(b.e.Sources, s)
+	b.e.ByName[s.SourcePackage] = idx
+	b.e.ByComponent[s.ComponentID] = append(b.e.ByComponent[s.ComponentID], idx)
+	b.e.ByVerdict[s.VerdictID] = append(b.e.ByVerdict[s.VerdictID], idx)
+	b.e.ByMaintainer[s.MaintainerID] = append(b.e.ByMaintainer[s.MaintainerID], idx)
 	if s.IsCandidate {
-		b.e.Candidates = append(b.e.Candidates, s)
+		b.e.Candidates = append(b.e.Candidates, idx)
 	}
 }
 
@@ -235,7 +307,50 @@ func (b *Builder) Build(generatedDate time.Time) *Excuses {
 	b.e.Maintainers, b.e.MaintainerIDs = b.maintainers.export()
 	b.e.Statuses, b.e.StatusIDs = b.statuses.export()
 	b.e.Arches, b.e.ArchIDs = b.arches.export()
+	b.e.SwiftAuths, b.e.SwiftAuthIDs = b.swiftAuths.export()
 	return &b.e
+}
+
+// SetRelease stores the Ubuntu release codename.
+func (b *Builder) SetRelease(release string) { b.e.Release = release }
+
+// URL reconstruction constants.
+const (
+	swiftBase  = "https://objectstorage.prodstack5.canonical.com/swift/v1"
+	pkgURLBase = "https://autopkgtest.ubuntu.com/packages"
+)
+
+// poolPrefix returns the Debian pool-style prefix for a package name:
+// "lib" + 4th char for packages starting with "lib", otherwise the first char.
+func poolPrefix(pkg string) string {
+	if len(pkg) == 0 {
+		return ""
+	}
+	if strings.HasPrefix(pkg, "lib") && len(pkg) > 3 {
+		return pkg[:4]
+	}
+	return pkg[:1]
+}
+
+// LogURL reconstructs the full autopkgtest log URL for a result.
+// pkg is the source package name (not "pkg/version"), arch is the architecture string.
+// Returns empty string when the result has no log run ID.
+func (e *Excuses) LogURL(pkg, arch string, r *AutopkgtestResult) string {
+	if r.LogRunID == "" {
+		return ""
+	}
+	if int(r.SwiftAuthID) < 0 || int(r.SwiftAuthID) >= len(e.SwiftAuths) {
+		return ""
+	}
+	return fmt.Sprintf("%s/%s/autopkgtest-%s/%s/%s/%s/%s/%s@/log.gz",
+		swiftBase, e.SwiftAuths[r.SwiftAuthID], e.Release, e.Release, arch, poolPrefix(pkg), pkg, r.LogRunID)
+}
+
+// PkgURL reconstructs the autopkgtest package history URL.
+// pkg is the source package name, arch is the architecture string.
+func (e *Excuses) PkgURL(pkg, arch string) string {
+	return fmt.Sprintf("%s/%s/%s/%s/%s",
+		pkgURLBase, poolPrefix(pkg), pkg, e.Release, arch)
 }
 
 // internTable is a generic bidirectional intern table used during construction.
