@@ -1,6 +1,7 @@
 package ingest
 
 import (
+	"maps"
 	"strings"
 
 	"github.com/BAMF0/ubuntu-excuses-data/internal/domain"
@@ -11,10 +12,33 @@ import (
 // interning repeated strings and building all lookup indexes in a single pass.
 func ToExcuses(f *yaml.ExcusesFile) *domain.Excuses {
 	b := domain.NewBuilder(len(f.Sources))
+	b.SetRelease(detectRelease(f))
 	for i := range f.Sources {
 		b.Add(toSource(b, &f.Sources[i]))
 	}
 	return b.Build(f.GeneratedDate)
+}
+
+// detectRelease extracts the Ubuntu release codename from the first PkgURL
+// found in the autopkgtest results. The URL pattern is:
+//
+//	https://autopkgtest.ubuntu.com/packages/{prefix}/{pkg}/{release}/{arch}
+func detectRelease(f *yaml.ExcusesFile) string {
+	for i := range f.Sources {
+		for _, arches := range f.Sources[i].PolicyInfo.Autopkgtest.Packages {
+			for _, res := range arches {
+				if res.PkgURL == nil {
+					continue
+				}
+				// .../packages/{prefix}/{pkg}/{release}/{arch}
+				parts := strings.Split(*res.PkgURL, "/")
+				if n := len(parts); n >= 2 {
+					return parts[n-2]
+				}
+			}
+		}
+	}
+	return ""
 }
 
 func toSource(b *domain.Builder, s *yaml.Source) *domain.Source {
@@ -92,15 +116,57 @@ func toAutopkgtestPolicy(b *domain.Builder, a yaml.AutopkgtestPolicy) domain.Aut
 	for pkg, arches := range a.Packages {
 		archMap := make(map[domain.ArchID]domain.AutopkgtestResult, len(arches))
 		for arch, res := range arches {
-			archMap[b.InternArch(arch)] = domain.AutopkgtestResult{
+			runID, auth := parseLogURL(res.LogURL)
+			result := domain.AutopkgtestResult{
 				StatusID: b.InternStatus(res.Status),
-				LogURL:   copyPtr(res.LogURL),
-				PkgURL:   copyPtr(res.PkgURL),
+				LogRunID: runID,
 			}
+			if auth != "" {
+				result.SwiftAuthID = b.InternSwiftAuth(auth)
+			}
+			archMap[b.InternArch(arch)] = result
 		}
 		dp.Packages[pkg] = archMap
 	}
 	return dp
+}
+
+// parseLogURL extracts the run ID and Swift AUTH token from a full log URL.
+// The expected pattern is:
+//
+//	https://objectstorage.…/swift/v1/{AUTH_xxx}/autopkgtest-{release}/…/{runID}@/log.gz
+//
+// Returns empty strings for nil or non-matching URLs.
+func parseLogURL(u *string) (runID, auth string) {
+	if u == nil {
+		return "", ""
+	}
+	s := *u
+
+	// Extract run ID from the "/{runID}@/log.gz" suffix.
+	const suffix = "@/log.gz"
+	idx := strings.LastIndex(s, suffix)
+	if idx < 0 {
+		return "", ""
+	}
+	slash := strings.LastIndex(s[:idx], "/")
+	if slash < 0 {
+		return "", ""
+	}
+	runID = s[slash+1 : idx]
+
+	// Extract the AUTH token between "/swift/v1/" and "/autopkgtest-".
+	const swiftMarker = "/swift/v1/"
+	_, after, ok := strings.Cut(s, swiftMarker)
+	if !ok {
+		return runID, ""
+	}
+	afterSwift := after
+	if end := strings.Index(afterSwift, "/"); end > 0 {
+		auth = afterSwift[:end]
+	}
+
+	return runID, auth
 }
 
 // toExcuse parses the raw excuse strings into a structured Excuse.
@@ -165,18 +231,6 @@ func copyMap[K comparable, V any](m map[K]V) map[K]V {
 		return nil
 	}
 	out := make(map[K]V, len(m))
-	for k, v := range m {
-		out[k] = v
-	}
+	maps.Copy(out, m)
 	return out
-}
-
-// copyPtr returns a pointer to a copy of the value pointed to by p,
-// breaking any reference to the original. Returns nil for nil input.
-func copyPtr[T any](p *T) *T {
-	if p == nil {
-		return nil
-	}
-	v := *p
-	return &v
 }

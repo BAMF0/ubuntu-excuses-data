@@ -1,6 +1,8 @@
 package api
 
 import (
+	"strings"
+
 	"github.com/BAMF0/ubuntu-excuses-data/internal/domain"
 )
 
@@ -192,13 +194,26 @@ func newAutopkgtestPolicyResponse(e *domain.Excuses, a *domain.AutopkgtestPolicy
 		Packages: make(map[string]map[string]AutopkgtestResultResponse, len(a.Packages)),
 	}
 	for pkg, arches := range a.Packages {
+		// Extract the source package name from the "pkg/version" key.
+		pkgName := pkg
+		if i := strings.Index(pkg, "/"); i > 0 {
+			pkgName = pkg[:i]
+		}
+
 		archMap := make(map[string]AutopkgtestResultResponse, len(arches))
 		for archID, res := range arches {
-			archMap[e.Arches[archID]] = AutopkgtestResultResponse{
+			arch := e.Arches[archID]
+			resp := AutopkgtestResultResponse{
 				Status: e.Statuses[res.StatusID],
-				LogURL: res.LogURL,
-				PkgURL: res.PkgURL,
 			}
+			if logURL := e.LogURL(pkgName, arch, &res); logURL != "" {
+				resp.LogURL = &logURL
+			}
+			if e.Release != "" {
+				pkgURL := e.PkgURL(pkgName, arch)
+				resp.PkgURL = &pkgURL
+			}
+			archMap[arch] = resp
 		}
 		r.Packages[pkg] = archMap
 	}
