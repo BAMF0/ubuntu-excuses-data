@@ -5,23 +5,43 @@ import (
 	"log"
 	"net/http"
 	"sort"
+	"strconv"
 
 	"github.com/BAMF0/ubuntu-excuses-data/internal/domain"
 )
 
 // Handler holds a reference to the read-only domain model and serves API requests.
+// Pre-computed fields are populated once at construction time since the dataset
+// is immutable after startup.
 type Handler struct {
 	excuses *domain.Excuses
+
+	// Pre-computed at construction time.
+	allSorted    []*domain.Source // alphabetically sorted, computed once
+	metaRespJSON []byte           // pre-serialized /meta JSON
 }
 
-// NewHandler creates a Handler backed by the given Excuses dataset.
+// NewHandler creates a Handler backed by the given Excuses dataset and
+// pre-computes derived data that would otherwise be rebuilt per-request.
 func NewHandler(e *domain.Excuses) *Handler {
-	return &Handler{excuses: e}
+	h := &Handler{excuses: e}
+	h.allSorted = h.computeSortedSources()
+	h.metaRespJSON = mustMarshalJSON(NewMetaResponse(e))
+	return h
+}
+
+func mustMarshalJSON(v any) []byte {
+	b, err := json.Marshal(v)
+	if err != nil {
+		log.Fatalf("pre-marshal JSON: %v", err)
+	}
+	return b
 }
 
 // GetMeta returns dataset metadata and available filter values.
+// The response is pre-serialized at startup since the dataset is immutable.
 func (h *Handler) GetMeta(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, NewMetaResponse(h.excuses))
+	writeRawJSON(w, http.StatusOK, h.metaRespJSON)
 }
 
 // ListSources returns a paginated, optionally filtered and sorted list of sources.
@@ -126,8 +146,13 @@ func (h *Handler) filteredSources(f SourceFilters) []*domain.Source {
 	return out
 }
 
-// allSourcesSorted returns all sources in deterministic alphabetical order.
+// allSourcesSorted returns the pre-computed alphabetically sorted source list.
 func (h *Handler) allSourcesSorted() []*domain.Source {
+	return h.allSorted
+}
+
+// computeSortedSources builds the sorted slice once at startup.
+func (h *Handler) computeSortedSources() []*domain.Source {
 	sources := make([]*domain.Source, 0, len(h.excuses.ByName))
 	for _, s := range h.excuses.ByName {
 		sources = append(sources, s)
@@ -177,10 +202,21 @@ type errorResponse struct {
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
+	data, err := json.Marshal(v)
+	if err != nil {
+		log.Printf("writeJSON: marshal failed: %v", err)
+		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+		return
+	}
+	writeRawJSON(w, status, data)
+}
+
+func writeRawJSON(w http.ResponseWriter, status int, data []byte) {
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
 	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(v); err != nil {
-		log.Printf("writeJSON: encode failed: %v", err)
+	if _, err := w.Write(data); err != nil {
+		log.Printf("writeRawJSON: write failed: %v", err)
 	}
 }
 
