@@ -167,11 +167,11 @@ Returns the autopkgtest policy results for a single source package.
 
 Each `Result` contains:
 
-| Field     | Type      | Description                          |
-|-----------|-----------|--------------------------------------|
-| `status`  | `string`  | Test status (e.g. `PASS`, `REGRESSION`) |
-| `log_url` | `string?` | URL to the test log (may be null)    |
-| `pkg_url` | `string?` | URL to the package info (may be null)|
+| Field     | Type      | Description                               |
+|-----------|-----------|-------------------------------------------|
+| `status`  | `string`  | Test status (e.g. `PASS`, `REGRESSION`)   |
+| `log_url` | `string`  | Optional URL to the test log; omitted when unavailable |
+| `pkg_url` | `string`  | Optional URL to the package info; omitted when unavailable |
 
 #### Errors
 
@@ -223,11 +223,11 @@ The full source object returned by `/sources` and `/sources/{name}`:
 
 ### Excuse
 
-| Field    | Type       | Description                                  |
-|----------|------------|----------------------------------------------|
-| `status` | `string`   | Migration status                             |
-| `detail` | `string`   | Detail text after the status (may be empty)  |
-| `info`   | `string[]` | Additional informational lines               |
+| Field    | Type       | Description                                             |
+|----------|------------|---------------------------------------------------------|
+| `status` | `string`   | Migration status                                        |
+| `detail` | `string`   | Detail text after the status (omitted when empty)       |
+| `info`   | `string[]` | Additional informational lines (omitted when empty)     |
 
 ### PolicyInfo
 
@@ -254,19 +254,19 @@ The full source object returned by `/sources` and `/sources/{name}`:
 
 ### RcBugsPolicy
 
-| Field               | Type      | Description                           |
-|---------------------|-----------|---------------------------------------|
-| `shared_bugs`       | `int[]`   | Bug IDs shared between source/target  |
-| `unique_source_bugs`| `int[]`   | Bug IDs unique to source              |
-| `unique_target_bugs`| `int[]`   | Bug IDs unique to target              |
-| `verdict`           | `string`  | RC bugs verdict                       |
+| Field               | Type                | Description                           |
+|---------------------|---------------------|---------------------------------------|
+| `shared_bugs`       | `integer[]`         | Bug IDs shared between source/target  |
+| `unique_source_bugs`| `integer[]`         | Bug IDs unique to source              |
+| `unique_target_bugs`| `integer[]`         | Bug IDs unique to target              |
+| `verdict`           | `string`            | RC bugs verdict                       |
 
 ### UpdateExcusePolicy
 
-| Field     | Type               | Description                                          |
-|-----------|--------------------|------------------------------------------------------|
-| `verdict` | `string`           | Update excuse verdict                                |
-| `bugs`    | `map[string]int64` | Launchpad bug ID → last-updated Unix timestamp       |
+| Field     | Type                     | Description                                          |
+|-----------|--------------------------|------------------------------------------------------|
+| `verdict` | `string`                 | Update excuse verdict                                |
+| `bugs`    | `object<string, integer>`| Launchpad bug ID → last-updated Unix timestamp       |
 
 ### Dependencies
 
