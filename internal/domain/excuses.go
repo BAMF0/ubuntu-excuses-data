@@ -323,6 +323,9 @@ const (
 // poolPrefix returns the Debian pool-style prefix for a package name:
 // "lib" + 4th char for packages starting with "lib", otherwise the first char.
 func poolPrefix(pkg string) string {
+	if len(pkg) == 0 {
+		return ""
+	}
 	if strings.HasPrefix(pkg, "lib") && len(pkg) > 3 {
 		return pkg[:4]
 	}

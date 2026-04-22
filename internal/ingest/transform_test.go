@@ -91,6 +91,7 @@ func TestParseLogURL(t *testing.T) {
 		{"nil", nil, "", ""},
 		{"normal", strPtr("https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_0f9aae918d5b4744bf7b827671c86842/autopkgtest-resolute/resolute/amd64/b/bash/20260420_114305_a5f93@/log.gz"), "20260420_114305_a5f93", "AUTH_0f9aae918d5b4744bf7b827671c86842"},
 		{"different_auth", strPtr("https://objectstorage.prodstack5.canonical.com/swift/v1/AUTH_abc123/autopkgtest-resolute/resolute/amd64/b/bash/20260420_114305_a5f93@/log.gz"), "20260420_114305_a5f93", "AUTH_abc123"},
+		{"run_without_auth", strPtr("https://example.com/autopkgtest-resolute/resolute/amd64/b/bash/20260420_114305_a5f93@/log.gz"), "20260420_114305_a5f93", ""},
 		{"no_match", strPtr("https://autopkgtest.ubuntu.com/running"), "", ""},
 		{"empty", strPtr(""), "", ""},
 	}
