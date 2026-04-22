@@ -339,6 +339,9 @@ func (e *Excuses) LogURL(pkg, arch string, r *AutopkgtestResult) string {
 	if r.LogRunID == "" {
 		return ""
 	}
+	if int(r.SwiftAuthID) < 0 || int(r.SwiftAuthID) >= len(e.SwiftAuths) {
+		return ""
+	}
 	return fmt.Sprintf("%s/%s/autopkgtest-%s/%s/%s/%s/%s/%s@/log.gz",
 		swiftBase, e.SwiftAuths[r.SwiftAuthID], e.Release, e.Release, arch, poolPrefix(pkg), pkg, r.LogRunID)
 }

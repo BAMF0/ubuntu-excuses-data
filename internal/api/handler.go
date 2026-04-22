@@ -18,7 +18,7 @@ type Handler struct {
 	excuses *domain.Excuses
 
 	// Pre-computed at construction time.
-	allSorted    []domain.SourceIdx // alphabetically sorted, computed once
+	allSorted    []domain.SourceIdx // sorted by age ascending with name tiebreak, computed once
 	metaRespJSON []byte             // pre-serialized /meta JSON
 }
 
@@ -55,12 +55,10 @@ func (h *Handler) ListSources(w http.ResponseWriter, r *http.Request) {
 
 	idxs := h.filteredIdxs(filters)
 
-	if !isDefaultSort {
-		// filteredIdxs returns a shared slice when filters are empty;
-		// clone before sorting in-place.
-		if filters.IsEmpty() {
-			idxs = slices.Clone(idxs)
-		}
+	if !isDefaultSort || !filters.IsEmpty() {
+		// filteredIdxs may return shared precomputed slices for both empty and
+		// non-empty filters; clone before sorting in-place.
+		idxs = slices.Clone(idxs)
 		h.sortIdxs(idxs, sortOrder)
 	}
 

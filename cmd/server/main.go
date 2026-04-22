@@ -105,6 +105,7 @@ func gzipMiddleware(next http.Handler) http.Handler {
 			if err := gz.Close(); err != nil {
 				log.Printf("gzip close: %v", err)
 			}
+			gz.Reset(io.Discard)
 			gzipPool.Put(gz)
 		}()
 		w.Header().Set("Content-Encoding", "gzip")

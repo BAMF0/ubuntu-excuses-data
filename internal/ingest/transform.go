@@ -119,9 +119,9 @@ func toAutopkgtestPolicy(b *domain.Builder, a yaml.AutopkgtestPolicy) domain.Aut
 			runID, auth := parseLogURL(res.LogURL)
 			result := domain.AutopkgtestResult{
 				StatusID: b.InternStatus(res.Status),
-				LogRunID: runID,
 			}
 			if auth != "" {
+				result.LogRunID = runID
 				result.SwiftAuthID = b.InternSwiftAuth(auth)
 			}
 			results = append(results, domain.ArchResult{
