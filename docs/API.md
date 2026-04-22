@@ -60,7 +60,7 @@ Returns a paginated, optionally filtered and sorted list of source packages.
 |-------------|-----------|---------|------------------------------------------------------------|
 | `offset`    | `integer` | `0`     | Number of items to skip                                    |
 | `limit`     | `integer` | `50`    | Maximum items to return (max `200`)                        |
-| `sort`      | `string`  | `name`  | Sort field: `name` or `age`                                |
+| `sort`      | `string`  | `age`   | Sort field: `name` or `age`                                |
 | `order`     | `string`  | `asc`   | Sort direction: `asc` or `desc`                            |
 | `component` | `string`  | —       | Filter by component (e.g. `main`, `universe`)              |
 | `verdict`   | `string`  | —       | Filter by migration policy verdict                         |
