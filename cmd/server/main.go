@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/BAMF0/ubuntu-excuses-data/internal/api"
@@ -43,7 +44,7 @@ func main() {
 
 	excuses := ingest.ToExcuses(raw)
 	fmt.Printf("Loaded %d sources (%d candidates) generated %s\n",
-		len(excuses.ByName), len(excuses.Candidates),
+		len(excuses.Sources), len(excuses.Candidates),
 		excuses.GeneratedDate.Format("2006-01-02 15:04:05 UTC"))
 
 	mux := http.NewServeMux()
@@ -82,7 +83,15 @@ func (w *gzipResponseWriter) Write(b []byte) (int, error) {
 	return w.Writer.Write(b)
 }
 
+var gzipPool = sync.Pool{
+	New: func() any {
+		gz, _ := gzip.NewWriterLevel(io.Discard, gzip.BestSpeed)
+		return gz
+	},
+}
+
 // gzipMiddleware transparently compresses responses for clients that support it.
+// Writers are pooled to avoid the cost of initialising new gzip compressors per request.
 func gzipMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Vary", "Accept-Encoding")
@@ -90,16 +99,13 @@ func gzipMiddleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		gz, err := gzip.NewWriterLevel(w, gzip.BestSpeed)
-		if err != nil {
-			log.Printf("gzip writer create: %v", err)
-			next.ServeHTTP(w, r)
-			return
-		}
+		gz := gzipPool.Get().(*gzip.Writer)
+		gz.Reset(w)
 		defer func() {
 			if err := gz.Close(); err != nil {
 				log.Printf("gzip close: %v", err)
 			}
+			gzipPool.Put(gz)
 		}()
 		w.Header().Set("Content-Encoding", "gzip")
 		next.ServeHTTP(&gzipResponseWriter{Writer: gz, ResponseWriter: w}, r)

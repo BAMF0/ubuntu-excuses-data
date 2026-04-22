@@ -1,10 +1,11 @@
 package api
 
 import (
+	"cmp"
 	"encoding/json"
 	"log"
 	"net/http"
-	"sort"
+	"slices"
 	"strconv"
 
 	"github.com/BAMF0/ubuntu-excuses-data/internal/domain"
@@ -17,15 +18,15 @@ type Handler struct {
 	excuses *domain.Excuses
 
 	// Pre-computed at construction time.
-	allSorted    []*domain.Source // alphabetically sorted, computed once
-	metaRespJSON []byte           // pre-serialized /meta JSON
+	allSorted    []domain.SourceIdx // alphabetically sorted, computed once
+	metaRespJSON []byte             // pre-serialized /meta JSON
 }
 
 // NewHandler creates a Handler backed by the given Excuses dataset and
 // pre-computes derived data that would otherwise be rebuilt per-request.
 func NewHandler(e *domain.Excuses) *Handler {
 	h := &Handler{excuses: e}
-	h.allSorted = h.computeSortedSources()
+	h.allSorted = h.computeSortedIdxs()
 	h.metaRespJSON = mustMarshalJSON(NewMetaResponse(e))
 	return h
 }
@@ -50,16 +51,25 @@ func (h *Handler) ListSources(w http.ResponseWriter, r *http.Request) {
 	page := ParsePagination(r)
 	sortOrder := ParseSortOrder(r)
 
-	sources := h.filteredSources(filters)
-	sources = append([]*domain.Source(nil), sources...)
-	sortSources(sources, sortOrder)
+	isDefaultSort := sortOrder.Field == SortByAge && sortOrder.Direction == SortAsc
 
-	total := len(sources)
+	idxs := h.filteredIdxs(filters)
+
+	if !isDefaultSort {
+		// filteredIdxs returns a shared slice when filters are empty;
+		// clone before sorting in-place.
+		if filters.IsEmpty() {
+			idxs = slices.Clone(idxs)
+		}
+		h.sortIdxs(idxs, sortOrder)
+	}
+
+	total := len(idxs)
 	start, end := clampRange(page.Offset, page.Limit, total)
 
 	items := make([]SourceResponse, 0, end-start)
-	for _, s := range sources[start:end] {
-		items = append(items, NewSourceResponse(h.excuses, s))
+	for _, idx := range idxs[start:end] {
+		items = append(items, NewSourceResponse(h.excuses, &h.excuses.Sources[idx]))
 	}
 
 	writeJSON(w, http.StatusOK, SourceListResponse{
@@ -76,8 +86,8 @@ func (h *Handler) ListSources(w http.ResponseWriter, r *http.Request) {
 // GetSource returns a single source by package name.
 func (h *Handler) GetSource(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
-	s, ok := h.excuses.ByName[name]
-	if !ok {
+	s := h.excuses.SourceByName(name)
+	if s == nil {
 		writeError(w, http.StatusNotFound, "source not found: "+name)
 		return
 	}
@@ -87,23 +97,24 @@ func (h *Handler) GetSource(w http.ResponseWriter, r *http.Request) {
 // GetSourceAutopkgtest returns the autopkgtest results for a single source.
 func (h *Handler) GetSourceAutopkgtest(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
-	s, ok := h.excuses.ByName[name]
-	if !ok {
+	s := h.excuses.SourceByName(name)
+	if s == nil {
 		writeError(w, http.StatusNotFound, "source not found: "+name)
 		return
 	}
 	writeJSON(w, http.StatusOK, newAutopkgtestPolicyResponse(h.excuses, &s.PolicyInfo.Autopkgtest))
 }
 
-// filteredSources returns the set of sources matching the given filters.
-// When multiple filters are specified, results must match all of them.
-func (h *Handler) filteredSources(f SourceFilters) []*domain.Source {
+// filteredIdxs returns the set of source indexes matching the given filters.
+// When no filters are specified, returns the pre-sorted index slice directly
+// (callers must not modify it). When filters are applied, a new slice is returned.
+func (h *Handler) filteredIdxs(f SourceFilters) []domain.SourceIdx {
 	if f.IsEmpty() {
-		return h.allSourcesSorted()
+		return h.allSorted
 	}
 
 	// Start with the most selective index-backed filter, then intersect.
-	var candidates []*domain.Source
+	var candidates []domain.SourceIdx
 	switch {
 	case f.Component != "":
 		id, ok := h.excuses.ComponentIDs[f.Component]
@@ -124,12 +135,13 @@ func (h *Handler) filteredSources(f SourceFilters) []*domain.Source {
 		}
 		candidates = h.excuses.ByMaintainer[id]
 	default:
-		candidates = h.allSourcesSorted()
+		candidates = h.allSorted
 	}
 
 	// Apply remaining filters linearly.
-	var out []*domain.Source
-	for _, s := range candidates {
+	var out []domain.SourceIdx
+	for _, idx := range candidates {
+		s := &h.excuses.Sources[idx]
 		if f.Component != "" && h.excuses.Components[s.ComponentID] != f.Component {
 			continue
 		}
@@ -142,51 +154,54 @@ func (h *Handler) filteredSources(f SourceFilters) []*domain.Source {
 		if f.MigrationStatus != "" && s.Excuse.Status.String() != f.MigrationStatus {
 			continue
 		}
-		out = append(out, s)
+		out = append(out, idx)
 	}
 	return out
 }
 
-// allSourcesSorted returns the pre-computed alphabetically sorted source list.
-func (h *Handler) allSourcesSorted() []*domain.Source {
-	return h.allSorted
-}
-
-// computeSortedSources builds the sorted slice once at startup.
-func (h *Handler) computeSortedSources() []*domain.Source {
-	sources := make([]*domain.Source, 0, len(h.excuses.ByName))
-	for _, s := range h.excuses.ByName {
-		sources = append(sources, s)
+// computeSortedIdxs builds the default-sorted (age ascending, name tiebreak)
+// index slice once at startup.
+func (h *Handler) computeSortedIdxs() []domain.SourceIdx {
+	idxs := make([]domain.SourceIdx, len(h.excuses.Sources))
+	for i := range idxs {
+		idxs[i] = domain.SourceIdx(i)
 	}
-	sort.Slice(sources, func(i, j int) bool {
-		return sources[i].SourcePackage < sources[j].SourcePackage
+	src := h.excuses.Sources
+	slices.SortFunc(idxs, func(a, b domain.SourceIdx) int {
+		if c := cmp.Compare(src[a].PolicyInfo.Age.CurrentAge, src[b].PolicyInfo.Age.CurrentAge); c != 0 {
+			return c
+		}
+		return cmp.Compare(src[a].SourcePackage, src[b].SourcePackage)
 	})
-	return sources
+	return idxs
 }
 
-// sortSources sorts sources in-place according to the given SortOrder.
+// sortIdxs sorts indexes in-place according to the given SortOrder.
 // A secondary sort by name is applied for deterministic ordering when primary
 // values are equal.
-func sortSources(sources []*domain.Source, o SortOrder) {
-	sort.Slice(sources, func(i, j int) bool {
+func (h *Handler) sortIdxs(idxs []domain.SourceIdx, o SortOrder) {
+	src := h.excuses.Sources
+	slices.SortFunc(idxs, func(a, b domain.SourceIdx) int {
 		switch o.Field {
 		case SortByAge:
-			ai, aj := sources[i].PolicyInfo.Age.CurrentAge, sources[j].PolicyInfo.Age.CurrentAge
-			if ai != aj {
+			c := cmp.Compare(src[a].PolicyInfo.Age.CurrentAge, src[b].PolicyInfo.Age.CurrentAge)
+			if c != 0 {
 				if o.Direction == SortDesc {
-					return ai > aj
+					return -c
 				}
-				return ai < aj
+				return c
 			}
+			c = cmp.Compare(src[a].SourcePackage, src[b].SourcePackage)
 			if o.Direction == SortDesc {
-				return sources[i].SourcePackage > sources[j].SourcePackage
+				return -c
 			}
-			return sources[i].SourcePackage < sources[j].SourcePackage
+			return c
 		default: // SortByName
+			c := cmp.Compare(src[a].SourcePackage, src[b].SourcePackage)
 			if o.Direction == SortDesc {
-				return sources[i].SourcePackage > sources[j].SourcePackage
+				return -c
 			}
-			return sources[i].SourcePackage < sources[j].SourcePackage
+			return c
 		}
 	})
 }

@@ -111,13 +111,13 @@ func (d SortDirection) String() string {
 // Supported order values: "asc" (default), "desc".
 func ParseSortOrder(r *http.Request) SortOrder {
 	s := SortOrder{
-		Field:     SortByName,
+		Field:     SortByAge,
 		Direction: SortAsc,
 	}
 
 	switch strings.ToLower(r.URL.Query().Get("sort")) {
-	case "age":
-		s.Field = SortByAge
+	case "name":
+		s.Field = SortByName
 	}
 
 	switch strings.ToLower(r.URL.Query().Get("order")) {

@@ -132,7 +132,7 @@ func TestURLRoundTrip(t *testing.T) {
 	// Walk all autopkgtest results and verify that reconstructed URLs match
 	// the original YAML URLs for entries with normal log URLs.
 	src := f.Sources[0]
-	domSrc := excuses.ByName[src.SourcePackage]
+	domSrc := excuses.SourceByName(src.SourcePackage)
 	if domSrc == nil {
 		t.Fatal("source not found in domain model")
 	}
@@ -153,7 +153,7 @@ func TestURLRoundTrip(t *testing.T) {
 				t.Errorf("unknown arch %q", archName)
 				continue
 			}
-			domRes, ok := domArches[archID]
+			domRes, ok := domArches.Find(archID)
 			if !ok {
 				t.Errorf("missing arch %q for %q", archName, pkgVer)
 				continue

@@ -41,8 +41,8 @@ func detectRelease(f *yaml.ExcusesFile) string {
 	return ""
 }
 
-func toSource(b *domain.Builder, s *yaml.Source) *domain.Source {
-	ds := &domain.Source{
+func toSource(b *domain.Builder, s *yaml.Source) domain.Source {
+	ds := domain.Source{
 		ComponentID:        b.InternComponent(s.Component),
 		MaintainerID:       b.InternMaintainer(s.Maintainer),
 		VerdictID:          b.InternVerdict(s.MigrationPolicyVerdict),
@@ -58,7 +58,7 @@ func toSource(b *domain.Builder, s *yaml.Source) *domain.Source {
 		SourcePackage:      s.SourcePackage,
 	}
 	if s.Dependencies != nil {
-		ds.Dependencies = &domain.Dependencies{
+		ds.Dependencies = domain.Dependencies{
 			BlockedBy:    copySlice(s.Dependencies.BlockedBy),
 			MigrateAfter: copySlice(s.Dependencies.MigrateAfter),
 		}
@@ -111,10 +111,10 @@ func toPolicyInfo(b *domain.Builder, p yaml.PolicyInfo) domain.PolicyInfo {
 func toAutopkgtestPolicy(b *domain.Builder, a yaml.AutopkgtestPolicy) domain.AutopkgtestPolicy {
 	dp := domain.AutopkgtestPolicy{
 		Verdict:  a.Verdict,
-		Packages: make(map[string]map[domain.ArchID]domain.AutopkgtestResult, len(a.Packages)),
+		Packages: make(map[string]domain.ArchResults, len(a.Packages)),
 	}
 	for pkg, arches := range a.Packages {
-		archMap := make(map[domain.ArchID]domain.AutopkgtestResult, len(arches))
+		results := make(domain.ArchResults, 0, len(arches))
 		for arch, res := range arches {
 			runID, auth := parseLogURL(res.LogURL)
 			result := domain.AutopkgtestResult{
@@ -124,9 +124,12 @@ func toAutopkgtestPolicy(b *domain.Builder, a yaml.AutopkgtestPolicy) domain.Aut
 			if auth != "" {
 				result.SwiftAuthID = b.InternSwiftAuth(auth)
 			}
-			archMap[b.InternArch(arch)] = result
+			results = append(results, domain.ArchResult{
+				ArchID: b.InternArch(arch),
+				Result: result,
+			})
 		}
-		dp.Packages[pkg] = archMap
+		dp.Packages[pkg] = results
 	}
 	return dp
 }
