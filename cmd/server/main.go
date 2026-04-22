@@ -85,11 +85,17 @@ func (w *gzipResponseWriter) Write(b []byte) (int, error) {
 // gzipMiddleware transparently compresses responses for clients that support it.
 func gzipMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Vary", "Accept-Encoding")
 		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
 			next.ServeHTTP(w, r)
 			return
 		}
-		gz, _ := gzip.NewWriterLevel(w, gzip.BestSpeed)
+		gz, err := gzip.NewWriterLevel(w, gzip.BestSpeed)
+		if err != nil {
+			log.Printf("gzip writer create: %v", err)
+			next.ServeHTTP(w, r)
+			return
+		}
 		defer func() {
 			if err := gz.Close(); err != nil {
 				log.Printf("gzip close: %v", err)
