@@ -23,6 +23,7 @@ type MetaResponse struct {
 // containing only the fields needed for triage before drilling into /sources/{name}.
 type BlockedSourceResponse struct {
 	SourcePackage string              `json:"source_package"`
+	Team          string              `json:"team,omitempty"`
 	Verdict       string              `json:"verdict"`
 	OldVersion    string              `json:"old_version"`
 	NewVersion    string              `json:"new_version"`
@@ -57,6 +58,7 @@ type SourceListResponse struct {
 // SourceResponse is the JSON representation of a single source package.
 type SourceResponse struct {
 	SourcePackage      string              `json:"source_package"`
+	Team               string              `json:"team,omitempty"`
 	Component          string              `json:"component"`
 	Maintainer         string              `json:"maintainer"`
 	Verdict            string              `json:"verdict"`
@@ -161,9 +163,10 @@ func NewMetaResponse(e *domain.Excuses) MetaResponse {
 }
 
 // NewBlockedSourceResponse converts a domain.Source into the slim blocked DTO.
-func NewBlockedSourceResponse(e *domain.Excuses, s *domain.Source) BlockedSourceResponse {
+func NewBlockedSourceResponse(e *domain.Excuses, teams domain.TeamMappings, s *domain.Source) BlockedSourceResponse {
 	r := BlockedSourceResponse{
 		SourcePackage: s.SourcePackage,
+		Team:          teams.Team(s.SourcePackage),
 		Verdict:       e.Verdicts[s.VerdictID],
 		OldVersion:    s.OldVersion,
 		NewVersion:    s.NewVersion,
@@ -183,9 +186,10 @@ func NewBlockedSourceResponse(e *domain.Excuses, s *domain.Source) BlockedSource
 
 // NewSourceResponse converts a domain.Source into its JSON DTO, resolving
 // all interned IDs using the parent Excuses.
-func NewSourceResponse(e *domain.Excuses, s *domain.Source) SourceResponse {
+func NewSourceResponse(e *domain.Excuses, teams domain.TeamMappings, s *domain.Source) SourceResponse {
 	r := SourceResponse{
 		SourcePackage:      s.SourcePackage,
+		Team:               teams.Team(s.SourcePackage),
 		Component:          e.Components[s.ComponentID],
 		Maintainer:         e.Maintainers[s.MaintainerID],
 		Verdict:            e.Verdicts[s.VerdictID],

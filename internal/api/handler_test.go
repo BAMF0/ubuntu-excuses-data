@@ -82,7 +82,7 @@ func testExcuses() *domain.Excuses {
 
 func newTestServer(e *domain.Excuses) *httptest.Server {
 	mux := http.NewServeMux()
-	RegisterRoutes(mux, e)
+	RegisterRoutes(mux, e, domain.TeamMappings{"bash": "ubuntu-core", "zlib": "ubuntu-core"})
 	return httptest.NewServer(mux)
 }
 

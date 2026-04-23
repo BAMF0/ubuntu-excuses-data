@@ -17,6 +17,7 @@ import (
 // is immutable after startup.
 type Handler struct {
 	excuses *domain.Excuses
+	teams   domain.TeamMappings
 
 	// Pre-computed at construction time.
 	allSorted    []domain.SourceIdx // sorted by age ascending with name tiebreak, computed once
@@ -25,8 +26,8 @@ type Handler struct {
 
 // NewHandler creates a Handler backed by the given Excuses dataset and
 // pre-computes derived data that would otherwise be rebuilt per-request.
-func NewHandler(e *domain.Excuses) *Handler {
-	h := &Handler{excuses: e}
+func NewHandler(e *domain.Excuses, teams domain.TeamMappings) *Handler {
+	h := &Handler{excuses: e, teams: teams}
 	h.allSorted = h.computeSortedIdxs()
 	h.metaRespJSON = mustMarshalJSON(NewMetaResponse(e))
 	return h
@@ -68,7 +69,7 @@ func (h *Handler) ListSources(w http.ResponseWriter, r *http.Request) {
 
 	items := make([]SourceResponse, 0, end-start)
 	for _, idx := range idxs[start:end] {
-		items = append(items, NewSourceResponse(h.excuses, &h.excuses.Sources[idx]))
+		items = append(items, NewSourceResponse(h.excuses, h.teams, &h.excuses.Sources[idx]))
 	}
 
 	writeJSON(w, http.StatusOK, SourceListResponse{
@@ -90,7 +91,7 @@ func (h *Handler) GetSource(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "source not found: "+name)
 		return
 	}
-	writeJSON(w, http.StatusOK, NewSourceResponse(h.excuses, s))
+	writeJSON(w, http.StatusOK, NewSourceResponse(h.excuses, h.teams, s))
 }
 
 // GetSourceAutopkgtest returns the autopkgtest results for a single source.
@@ -139,7 +140,7 @@ func (h *Handler) ListBlocked(w http.ResponseWriter, r *http.Request) {
 
 	items := make([]BlockedSourceResponse, 0, end-start)
 	for _, idx := range filtered[start:end] {
-		items = append(items, NewBlockedSourceResponse(h.excuses, &h.excuses.Sources[idx]))
+		items = append(items, NewBlockedSourceResponse(h.excuses, h.teams, &h.excuses.Sources[idx]))
 	}
 
 	writeJSON(w, http.StatusOK, BlockedListResponse{

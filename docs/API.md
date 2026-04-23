@@ -89,6 +89,7 @@ Each `BlockedSource` contains:
 | Field            | Type            | Description                                          |
 |------------------|-----------------|------------------------------------------------------|
 | `source_package` | `string`        | Package name                                         |
+| `team`           | `string`        | Team responsible for the package (omitted if unknown)|
 | `verdict`        | `string`        | Migration policy verdict                             |
 | `old_version`    | `string`        | Current version in the target suite                  |
 | `new_version`    | `string`        | Proposed version in the source suite                 |
@@ -288,6 +289,7 @@ The full source object returned by `/sources` and `/sources/{name}`:
 | Field                  | Type                | Description                                          |
 |------------------------|---------------------|------------------------------------------------------|
 | `source_package`       | `string`            | Package name                                         |
+| `team`                 | `string`            | Team responsible for the package (omitted if unknown)|
 | `component`            | `string`            | Archive component (e.g. `main`)                      |
 | `maintainer`           | `string`            | Package maintainer                                   |
 | `verdict`              | `string`            | Migration policy verdict                             |
