@@ -29,6 +29,7 @@ Returns dataset metadata and the distinct values available for filtering.
 | `maintainers`      | `string[]` | Available maintainer values for filtering        |
 | `arches`           | `string[]` | Architecture names present in test results       |
 | `statuses`         | `string[]` | Autopkgtest status values (e.g. `PASS`, `REGRESSION`) |
+| `teams`            | `string[]` | Sorted list of team names from package-team mappings |
 
 #### Example
 
@@ -71,6 +72,7 @@ Returns a paginated list of all source packages with `BLOCKED` migration status.
 | `order`     | `string`  | `asc`   | Sort direction: `asc` or `desc`                            |
 | `search`    | `string`  | —       | Substring match on source package name                     |
 | `depends`   | `string`  | —       | Filter to packages with a dependency relationship (blocked_by, blocks, migrate_after) involving the given package name |
+| `team`      | `string`  | —       | Exact match on team name (see `teams` in `/meta`)          |
 
 #### Response
 
@@ -94,6 +96,7 @@ Each `BlockedSource` contains:
 | `old_version`    | `string`        | Current version in the target suite                  |
 | `new_version`    | `string`        | Proposed version in the source suite                 |
 | `age`            | `number`        | Current age in days                                  |
+| `has_autopkgtest`| `boolean`       | Whether autopkgtest results exist for this package   |
 | `excuse_detail`  | `string`        | Reason text (omitted when empty)                     |
 | `dependencies`   | `Dependencies?` | Dependency information (omitted if none)             |
 | `hints`          | `Hint[]?`       | Migration hints (omitted if none)                    |
@@ -121,6 +124,7 @@ GET /blocked?sort=age&order=desc&limit=2
       "old_version": "1.0-1",
       "new_version": "1.1-1",
       "age": 15.5,
+      "has_autopkgtest": true,
       "excuse_detail": "introduces a regression",
       "dependencies": { "blocked_by": ["other-pkg"] },
       "hints": [{ "from": "release", "type": "block" }]

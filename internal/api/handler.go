@@ -29,7 +29,7 @@ type Handler struct {
 func NewHandler(e *domain.Excuses, teams domain.TeamMappings) *Handler {
 	h := &Handler{excuses: e, teams: teams}
 	h.allSorted = h.computeSortedIdxs()
-	h.metaRespJSON = mustMarshalJSON(NewMetaResponse(e))
+	h.metaRespJSON = mustMarshalJSON(NewMetaResponse(e, teams))
 	return h
 }
 
@@ -116,15 +116,18 @@ func (h *Handler) ListBlocked(w http.ResponseWriter, r *http.Request) {
 		idxs = []domain.SourceIdx{}
 	}
 
-	// Apply search/depends filters if present.
+	// Apply search/depends/team filters if present.
 	var filtered []domain.SourceIdx
-	if filters.Search != "" || filters.Depends != "" {
+	if filters.Search != "" || filters.Depends != "" || filters.Team != "" {
 		for _, idx := range idxs {
 			s := &h.excuses.Sources[idx]
 			if filters.Search != "" && !strings.Contains(s.SourcePackage, filters.Search) {
 				continue
 			}
 			if filters.Depends != "" && !dependsOn(s, filters.Depends) {
+				continue
+			}
+			if filters.Team != "" && h.teams.Team(s.SourcePackage) != filters.Team {
 				continue
 			}
 			filtered = append(filtered, idx)
