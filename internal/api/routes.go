@@ -11,6 +11,7 @@ func RegisterRoutes(mux *http.ServeMux, e *domain.Excuses) {
 	h := NewHandler(e)
 
 	mux.HandleFunc("GET /meta", h.GetMeta)
+	mux.HandleFunc("GET /blocked", h.ListBlocked)
 	mux.HandleFunc("GET /sources", h.ListSources)
 	mux.HandleFunc("GET /sources/{name}", h.GetSource)
 	mux.HandleFunc("GET /sources/{name}/autopkgtest", h.GetSourceAutopkgtest)

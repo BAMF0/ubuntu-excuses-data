@@ -54,6 +54,9 @@ func testExcuses() *domain.Excuses {
 			Status: domain.StatusBlocked,
 			Detail: "introduces a regression",
 		},
+		Dependencies: domain.Dependencies{
+			BlockedBy: []string{"bash"},
+		},
 		PolicyInfo: domain.PolicyInfo{
 			Age: domain.AgePolicy{AgeRequirement: 10, CurrentAge: 7, Verdict: "PASS"},
 		},
@@ -562,5 +565,130 @@ func TestListSources_DefaultSortInResponse(t *testing.T) {
 	}
 	if list.Order != "asc" {
 		t.Errorf("Order = %q, want asc", list.Order)
+	}
+}
+
+func TestGetMeta_MigrationStatusCounts(t *testing.T) {
+	srv := newTestServer(testExcuses())
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/meta")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	var meta MetaResponse
+	if err := json.NewDecoder(resp.Body).Decode(&meta); err != nil {
+		t.Fatal(err)
+	}
+	if meta.MigrationStatusCount == nil {
+		t.Fatal("MigrationStatusCount is nil")
+	}
+	if got := meta.MigrationStatusCount["BLOCKED"]; got != 1 {
+		t.Errorf("BLOCKED count = %d, want 1", got)
+	}
+	if got := meta.MigrationStatusCount["WILL_ATTEMPT"]; got != 1 {
+		t.Errorf("WILL_ATTEMPT count = %d, want 1", got)
+	}
+	if got := meta.MigrationStatusCount["WAITING"]; got != 1 {
+		t.Errorf("WAITING count = %d, want 1", got)
+	}
+}
+
+func TestListBlocked(t *testing.T) {
+	srv := newTestServer(testExcuses())
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/blocked")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+
+	var list BlockedListResponse
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		t.Fatal(err)
+	}
+	if list.Total != 1 {
+		t.Fatalf("Total = %d, want 1", list.Total)
+	}
+	src := list.Sources[0]
+	if src.SourcePackage != "zlib" {
+		t.Errorf("source = %q, want zlib", src.SourcePackage)
+	}
+	if src.Verdict != "REJECTED_PERMANENTLY" {
+		t.Errorf("verdict = %q, want REJECTED_PERMANENTLY", src.Verdict)
+	}
+	if src.OldVersion != "1.2-1" {
+		t.Errorf("old_version = %q, want 1.2-1", src.OldVersion)
+	}
+	if src.ExcuseDetail != "introduces a regression" {
+		t.Errorf("excuse_detail = %q, want 'introduces a regression'", src.ExcuseDetail)
+	}
+	if src.Age != 7 {
+		t.Errorf("age = %v, want 7", src.Age)
+	}
+	if src.Dependencies == nil || len(src.Dependencies.BlockedBy) != 1 {
+		t.Errorf("expected dependencies.blocked_by = [bash], got %v", src.Dependencies)
+	}
+}
+
+func TestBlocksReverseRelation(t *testing.T) {
+	e := testExcuses()
+
+	// zlib is blocked by bash, so bash should have Blocks: ["zlib"]
+	bash := e.SourceByName("bash")
+	if bash == nil {
+		t.Fatal("bash not found")
+	}
+	if len(bash.Dependencies.Blocks) != 1 || bash.Dependencies.Blocks[0] != "zlib" {
+		t.Errorf("bash.Blocks = %v, want [zlib]", bash.Dependencies.Blocks)
+	}
+
+	// zlib should have BlockedBy: ["bash"]
+	zlib := e.SourceByName("zlib")
+	if zlib == nil {
+		t.Fatal("zlib not found")
+	}
+	if len(zlib.Dependencies.BlockedBy) != 1 || zlib.Dependencies.BlockedBy[0] != "bash" {
+		t.Errorf("zlib.BlockedBy = %v, want [bash]", zlib.Dependencies.BlockedBy)
+	}
+
+	// The API response should include both relations
+	srv := newTestServer(e)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/sources/bash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	var src SourceResponse
+	if err := json.NewDecoder(resp.Body).Decode(&src); err != nil {
+		t.Fatal(err)
+	}
+	if src.Dependencies == nil {
+		t.Fatal("bash dependencies is nil, want blocks=[zlib]")
+	}
+	if len(src.Dependencies.Blocks) != 1 || src.Dependencies.Blocks[0] != "zlib" {
+		t.Errorf("bash API Blocks = %v, want [zlib]", src.Dependencies.Blocks)
 	}
 }

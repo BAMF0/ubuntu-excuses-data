@@ -103,6 +103,39 @@ func (h *Handler) GetSourceAutopkgtest(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, newAutopkgtestPolicyResponse(h.excuses, &s.PolicyInfo.Autopkgtest))
 }
 
+// ListBlocked returns a paginated list of sources with BLOCKED migration status.
+func (h *Handler) ListBlocked(w http.ResponseWriter, r *http.Request) {
+	page := ParsePagination(r)
+	sortOrder := ParseSortOrder(r)
+
+	idxs := h.excuses.ByMigrationStatus[domain.StatusBlocked]
+	if idxs == nil {
+		idxs = []domain.SourceIdx{}
+	}
+
+	// Always clone and sort since we need a stable copy for pagination.
+	sorted := slices.Clone(idxs)
+	h.sortIdxs(sorted, sortOrder)
+
+	total := len(sorted)
+	start, end := clampRange(page.Offset, page.Limit, total)
+
+	items := make([]BlockedSourceResponse, 0, end-start)
+	for _, idx := range sorted[start:end] {
+		items = append(items, NewBlockedSourceResponse(h.excuses, &h.excuses.Sources[idx]))
+	}
+
+	writeJSON(w, http.StatusOK, BlockedListResponse{
+		GeneratedDate: h.excuses.GeneratedDate.UTC().Format("2006-01-02T15:04:05Z"),
+		Total:         total,
+		Offset:        page.Offset,
+		Limit:         page.Limit,
+		Sort:          sortOrder.Field.String(),
+		Order:         sortOrder.Direction.String(),
+		Sources:       items,
+	})
+}
+
 // filteredIdxs returns the set of source indexes matching the given filters.
 // When no filters are specified, returns the pre-sorted index slice directly
 // (callers must not modify it). When filters are applied, a new slice is returned.

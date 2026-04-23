@@ -8,14 +8,39 @@ import (
 
 // MetaResponse describes the dataset and its available filter values.
 type MetaResponse struct {
-	GeneratedDate   string   `json:"generated_date"`
-	TotalSources    int      `json:"total_sources"`
-	TotalCandidates int      `json:"total_candidates"`
-	Components      []string `json:"components"`
-	Verdicts        []string `json:"verdicts"`
-	Maintainers     []string `json:"maintainers"`
-	Arches          []string `json:"arches"`
-	Statuses        []string `json:"statuses"`
+	GeneratedDate        string         `json:"generated_date"`
+	TotalSources         int            `json:"total_sources"`
+	TotalCandidates      int            `json:"total_candidates"`
+	MigrationStatusCount map[string]int `json:"migration_status_counts"`
+	Components           []string       `json:"components"`
+	Verdicts             []string       `json:"verdicts"`
+	Maintainers          []string       `json:"maintainers"`
+	Arches               []string       `json:"arches"`
+	Statuses             []string       `json:"statuses"`
+}
+
+// BlockedSourceResponse is a slim JSON representation for the /blocked endpoint,
+// containing only the fields needed for triage before drilling into /sources/{name}.
+type BlockedSourceResponse struct {
+	SourcePackage string              `json:"source_package"`
+	Verdict       string              `json:"verdict"`
+	OldVersion    string              `json:"old_version"`
+	NewVersion    string              `json:"new_version"`
+	Age           float64             `json:"age"`
+	ExcuseDetail  string              `json:"excuse_detail,omitempty"`
+	Dependencies  *DependencyResponse `json:"dependencies,omitempty"`
+	Hints         []HintResponse      `json:"hints,omitempty"`
+}
+
+// BlockedListResponse is the paginated envelope for the /blocked endpoint.
+type BlockedListResponse struct {
+	GeneratedDate string                  `json:"generated_date"`
+	Total         int                     `json:"total"`
+	Offset        int                     `json:"offset"`
+	Limit         int                     `json:"limit"`
+	Sort          string                  `json:"sort"`
+	Order         string                  `json:"order"`
+	Sources       []BlockedSourceResponse `json:"sources"`
 }
 
 // SourceListResponse is the paginated envelope for a list of sources.
@@ -58,6 +83,7 @@ type ExcuseResponse struct {
 // DependencyResponse lists blocking and ordering dependencies.
 type DependencyResponse struct {
 	BlockedBy    []string `json:"blocked_by,omitempty"`
+	Blocks       []string `json:"blocks,omitempty"`
 	MigrateAfter []string `json:"migrate_after,omitempty"`
 }
 
@@ -117,16 +143,42 @@ type UpdateExcusePolicyResponse struct {
 
 // NewMetaResponse builds a MetaResponse from a domain.Excuses.
 func NewMetaResponse(e *domain.Excuses) MetaResponse {
-	return MetaResponse{
-		GeneratedDate:   e.GeneratedDate.UTC().Format("2006-01-02T15:04:05Z"),
-		TotalSources:    len(e.Sources),
-		TotalCandidates: len(e.Candidates),
-		Components:      e.Components,
-		Verdicts:        e.Verdicts,
-		Maintainers:     e.Maintainers,
-		Arches:          e.Arches,
-		Statuses:        e.Statuses,
+	counts := make(map[string]int, len(e.ByMigrationStatus))
+	for status, idxs := range e.ByMigrationStatus {
+		counts[status.String()] = len(idxs)
 	}
+	return MetaResponse{
+		GeneratedDate:        e.GeneratedDate.UTC().Format("2006-01-02T15:04:05Z"),
+		TotalSources:         len(e.Sources),
+		TotalCandidates:      len(e.Candidates),
+		MigrationStatusCount: counts,
+		Components:           e.Components,
+		Verdicts:             e.Verdicts,
+		Maintainers:          e.Maintainers,
+		Arches:               e.Arches,
+		Statuses:             e.Statuses,
+	}
+}
+
+// NewBlockedSourceResponse converts a domain.Source into the slim blocked DTO.
+func NewBlockedSourceResponse(e *domain.Excuses, s *domain.Source) BlockedSourceResponse {
+	r := BlockedSourceResponse{
+		SourcePackage: s.SourcePackage,
+		Verdict:       e.Verdicts[s.VerdictID],
+		OldVersion:    s.OldVersion,
+		NewVersion:    s.NewVersion,
+		Age:           s.PolicyInfo.Age.CurrentAge,
+		ExcuseDetail:  s.Excuse.Detail,
+		Hints:         newHintResponses(s.Hints),
+	}
+	if s.Dependencies.HasAny() {
+		r.Dependencies = &DependencyResponse{
+			BlockedBy:    s.Dependencies.BlockedBy,
+			Blocks:       s.Dependencies.Blocks,
+			MigrateAfter: s.Dependencies.MigrateAfter,
+		}
+	}
+	return r
 }
 
 // NewSourceResponse converts a domain.Source into its JSON DTO, resolving
@@ -155,6 +207,7 @@ func NewSourceResponse(e *domain.Excuses, s *domain.Source) SourceResponse {
 	if s.Dependencies.HasAny() {
 		r.Dependencies = &DependencyResponse{
 			BlockedBy:    s.Dependencies.BlockedBy,
+			Blocks:       s.Dependencies.Blocks,
 			MigrateAfter: s.Dependencies.MigrateAfter,
 		}
 	}

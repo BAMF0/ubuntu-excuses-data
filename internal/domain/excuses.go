@@ -65,6 +65,9 @@ type Excuses struct {
 	ByVerdict    map[VerdictID][]SourceIdx
 	ByMaintainer map[MaintainerID][]SourceIdx
 
+	// ByMigrationStatus groups sources by their high-level migration status.
+	ByMigrationStatus map[MigrationStatus][]SourceIdx
+
 	// Candidates is pre-filtered: sources where IsCandidate == true.
 	Candidates []SourceIdx
 }
@@ -141,12 +144,13 @@ type Source struct {
 // Embedded as a value in Source to avoid a separate heap allocation.
 type Dependencies struct {
 	BlockedBy    []string
+	Blocks       []string // reverse of BlockedBy: packages this source is blocking
 	MigrateAfter []string
 }
 
 // HasAny returns true if any dependency is set.
 func (d *Dependencies) HasAny() bool {
-	return len(d.BlockedBy) > 0 || len(d.MigrateAfter) > 0
+	return len(d.BlockedBy) > 0 || len(d.Blocks) > 0 || len(d.MigrateAfter) > 0
 }
 
 // Hint represents a migration hint (e.g. block, unblock) applied to a source.
@@ -249,11 +253,12 @@ type Builder struct {
 func NewBuilder(capacity int) *Builder {
 	return &Builder{
 		e: Excuses{
-			Sources:      make([]Source, 0, capacity),
-			ByName:       make(map[string]SourceIdx, capacity),
-			ByComponent:  make(map[ComponentID][]SourceIdx),
-			ByVerdict:    make(map[VerdictID][]SourceIdx),
-			ByMaintainer: make(map[MaintainerID][]SourceIdx),
+			Sources:           make([]Source, 0, capacity),
+			ByName:            make(map[string]SourceIdx, capacity),
+			ByComponent:       make(map[ComponentID][]SourceIdx),
+			ByVerdict:         make(map[VerdictID][]SourceIdx),
+			ByMaintainer:      make(map[MaintainerID][]SourceIdx),
+			ByMigrationStatus: make(map[MigrationStatus][]SourceIdx),
 		},
 		components:  newInternTable[ComponentID](),
 		verdicts:    newInternTable[VerdictID](),
@@ -293,6 +298,7 @@ func (b *Builder) Add(s Source) {
 	b.e.ByComponent[s.ComponentID] = append(b.e.ByComponent[s.ComponentID], idx)
 	b.e.ByVerdict[s.VerdictID] = append(b.e.ByVerdict[s.VerdictID], idx)
 	b.e.ByMaintainer[s.MaintainerID] = append(b.e.ByMaintainer[s.MaintainerID], idx)
+	b.e.ByMigrationStatus[s.Excuse.Status] = append(b.e.ByMigrationStatus[s.Excuse.Status], idx)
 	if s.IsCandidate {
 		b.e.Candidates = append(b.e.Candidates, idx)
 	}
@@ -308,6 +314,23 @@ func (b *Builder) Build(generatedDate time.Time) *Excuses {
 	b.e.Statuses, b.e.StatusIDs = b.statuses.export()
 	b.e.Arches, b.e.ArchIDs = b.arches.export()
 	b.e.SwiftAuths, b.e.SwiftAuthIDs = b.swiftAuths.export()
+
+	// Compute the Blocks reverse relation from BlockedBy.
+	// For each source S that lists package P in its BlockedBy, add S's name
+	// to P's Blocks list.
+	blocksMap := make(map[string][]string, len(b.e.Sources)/4)
+	for i := range b.e.Sources {
+		src := &b.e.Sources[i]
+		for _, blocker := range src.Dependencies.BlockedBy {
+			blocksMap[blocker] = append(blocksMap[blocker], src.SourcePackage)
+		}
+	}
+	for name, blocks := range blocksMap {
+		if idx, ok := b.e.ByName[name]; ok {
+			b.e.Sources[idx].Dependencies.Blocks = blocks
+		}
+	}
+
 	return &b.e
 }
 
