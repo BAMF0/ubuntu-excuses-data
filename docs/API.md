@@ -69,6 +69,8 @@ Returns a paginated list of all source packages with `BLOCKED` migration status.
 | `limit`     | `integer` | `50`    | Maximum items to return (max `200`)                        |
 | `sort`      | `string`  | `age`   | Sort field: `name` or `age`                                |
 | `order`     | `string`  | `asc`   | Sort direction: `asc` or `desc`                            |
+| `search`    | `string`  | —       | Substring match on source package name                     |
+| `depends`   | `string`  | —       | Filter to packages with a dependency relationship (blocked_by, blocks, migrate_after) involving the given package name |
 
 #### Response
 
@@ -144,6 +146,8 @@ Returns a paginated, optionally filtered and sorted list of source packages.
 | `verdict`   | `string`  | —       | Filter by migration policy verdict                         |
 | `maintainer`| `string`  | —       | Filter by maintainer                                       |
 | `status`    | `string`  | —       | Filter by migration status: `BLOCKED`, `WILL_ATTEMPT`, `WAITING`, `UNKNOWN` |
+| `search`    | `string`  | —       | Substring match on source package name                     |
+| `depends`   | `string`  | —       | Filter to packages with a dependency relationship (blocked_by, blocks, migrate_after) involving the given package name |
 
 Multiple filters may be combined; results must match **all** specified filters.
 

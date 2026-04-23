@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/BAMF0/ubuntu-excuses-data/internal/domain"
 )
@@ -105,6 +106,7 @@ func (h *Handler) GetSourceAutopkgtest(w http.ResponseWriter, r *http.Request) {
 
 // ListBlocked returns a paginated list of sources with BLOCKED migration status.
 func (h *Handler) ListBlocked(w http.ResponseWriter, r *http.Request) {
+	filters := ParseSourceFilters(r)
 	page := ParsePagination(r)
 	sortOrder := ParseSortOrder(r)
 
@@ -113,15 +115,30 @@ func (h *Handler) ListBlocked(w http.ResponseWriter, r *http.Request) {
 		idxs = []domain.SourceIdx{}
 	}
 
-	// Always clone and sort since we need a stable copy for pagination.
-	sorted := slices.Clone(idxs)
-	h.sortIdxs(sorted, sortOrder)
+	// Apply search/depends filters if present.
+	var filtered []domain.SourceIdx
+	if filters.Search != "" || filters.Depends != "" {
+		for _, idx := range idxs {
+			s := &h.excuses.Sources[idx]
+			if filters.Search != "" && !strings.Contains(s.SourcePackage, filters.Search) {
+				continue
+			}
+			if filters.Depends != "" && !dependsOn(s, filters.Depends) {
+				continue
+			}
+			filtered = append(filtered, idx)
+		}
+	} else {
+		filtered = slices.Clone(idxs)
+	}
 
-	total := len(sorted)
+	h.sortIdxs(filtered, sortOrder)
+
+	total := len(filtered)
 	start, end := clampRange(page.Offset, page.Limit, total)
 
 	items := make([]BlockedSourceResponse, 0, end-start)
-	for _, idx := range sorted[start:end] {
+	for _, idx := range filtered[start:end] {
 		items = append(items, NewBlockedSourceResponse(h.excuses, &h.excuses.Sources[idx]))
 	}
 
@@ -185,9 +202,23 @@ func (h *Handler) filteredIdxs(f SourceFilters) []domain.SourceIdx {
 		if f.MigrationStatus != "" && s.Excuse.Status.String() != f.MigrationStatus {
 			continue
 		}
+		if f.Search != "" && !strings.Contains(s.SourcePackage, f.Search) {
+			continue
+		}
+		if f.Depends != "" && !dependsOn(s, f.Depends) {
+			continue
+		}
 		out = append(out, idx)
 	}
 	return out
+}
+
+// dependsOn returns true if the source has a dependency relationship
+// (blocked_by, blocks, or migrate_after) involving the named package.
+func dependsOn(s *domain.Source, name string) bool {
+	return slices.Contains(s.Dependencies.BlockedBy, name) ||
+		slices.Contains(s.Dependencies.Blocks, name) ||
+		slices.Contains(s.Dependencies.MigrateAfter, name)
 }
 
 // computeSortedIdxs builds the default-sorted (age ascending, name tiebreak)

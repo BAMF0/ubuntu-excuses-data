@@ -46,6 +46,8 @@ type SourceFilters struct {
 	Verdict         string
 	Maintainer      string
 	MigrationStatus string
+	Search          string // substring match on source package name
+	Depends         string // match packages that depend on (blocked_by, blocks, migrate_after) the given name
 }
 
 // ParseSourceFilters extracts filter parameters from the request.
@@ -56,12 +58,15 @@ func ParseSourceFilters(r *http.Request) SourceFilters {
 		Verdict:         q.Get("verdict"),
 		Maintainer:      q.Get("maintainer"),
 		MigrationStatus: q.Get("status"),
+		Search:          q.Get("search"),
+		Depends:         q.Get("depends"),
 	}
 }
 
 // IsEmpty returns true if no filters are set.
 func (f SourceFilters) IsEmpty() bool {
-	return f.Component == "" && f.Verdict == "" && f.Maintainer == "" && f.MigrationStatus == ""
+	return f.Component == "" && f.Verdict == "" && f.Maintainer == "" &&
+		f.MigrationStatus == "" && f.Search == "" && f.Depends == ""
 }
 
 // SortField identifies which field to sort sources by.

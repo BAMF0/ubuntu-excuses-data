@@ -692,3 +692,182 @@ func TestBlocksReverseRelation(t *testing.T) {
 		t.Errorf("bash API Blocks = %v, want [zlib]", src.Dependencies.Blocks)
 	}
 }
+
+func TestListSources_Search(t *testing.T) {
+	srv := newTestServer(testExcuses())
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/sources?search=ba")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	var list SourceListResponse
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		t.Fatal(err)
+	}
+	if list.Total != 1 {
+		t.Fatalf("Total = %d, want 1", list.Total)
+	}
+	if list.Sources[0].SourcePackage != "bash" {
+		t.Errorf("source = %q, want bash", list.Sources[0].SourcePackage)
+	}
+}
+
+func TestListSources_SearchNoMatch(t *testing.T) {
+	srv := newTestServer(testExcuses())
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/sources?search=nonexistent")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	var list SourceListResponse
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		t.Fatal(err)
+	}
+	if list.Total != 0 {
+		t.Errorf("Total = %d, want 0", list.Total)
+	}
+}
+
+func TestListSources_Depends(t *testing.T) {
+	srv := newTestServer(testExcuses())
+	defer srv.Close()
+
+	// zlib has blocked_by=["bash"], so depends=bash returns zlib
+	resp, err := http.Get(srv.URL + "/sources?depends=bash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	var list SourceListResponse
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		t.Fatal(err)
+	}
+	if list.Total != 1 {
+		t.Fatalf("Total = %d, want 1", list.Total)
+	}
+	if list.Sources[0].SourcePackage != "zlib" {
+		t.Errorf("source = %q, want zlib", list.Sources[0].SourcePackage)
+	}
+}
+
+func TestListSources_DependsReverse(t *testing.T) {
+	srv := newTestServer(testExcuses())
+	defer srv.Close()
+
+	// bash has blocks=["zlib"], so depends=zlib returns bash
+	resp, err := http.Get(srv.URL + "/sources?depends=zlib")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	var list SourceListResponse
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		t.Fatal(err)
+	}
+	if list.Total != 1 {
+		t.Fatalf("Total = %d, want 1", list.Total)
+	}
+	if list.Sources[0].SourcePackage != "bash" {
+		t.Errorf("source = %q, want bash", list.Sources[0].SourcePackage)
+	}
+}
+
+func TestListBlocked_Search(t *testing.T) {
+	srv := newTestServer(testExcuses())
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/blocked?search=zl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	var list BlockedListResponse
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		t.Fatal(err)
+	}
+	if list.Total != 1 {
+		t.Fatalf("Total = %d, want 1", list.Total)
+	}
+	if list.Sources[0].SourcePackage != "zlib" {
+		t.Errorf("source = %q, want zlib", list.Sources[0].SourcePackage)
+	}
+}
+
+func TestListBlocked_SearchNoMatch(t *testing.T) {
+	srv := newTestServer(testExcuses())
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/blocked?search=bash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	var list BlockedListResponse
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		t.Fatal(err)
+	}
+	if list.Total != 0 {
+		t.Errorf("Total = %d, want 0 (bash is not blocked)", list.Total)
+	}
+}
+
+func TestListBlocked_Depends(t *testing.T) {
+	srv := newTestServer(testExcuses())
+	defer srv.Close()
+
+	// zlib is blocked and has blocked_by=["bash"], so depends=bash should match
+	resp, err := http.Get(srv.URL + "/blocked?depends=bash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	var list BlockedListResponse
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		t.Fatal(err)
+	}
+	if list.Total != 1 {
+		t.Fatalf("Total = %d, want 1", list.Total)
+	}
+	if list.Sources[0].SourcePackage != "zlib" {
+		t.Errorf("source = %q, want zlib", list.Sources[0].SourcePackage)
+	}
+}
