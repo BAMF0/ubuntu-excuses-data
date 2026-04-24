@@ -923,3 +923,34 @@ func TestListSources_FilterByTeamNoMatch(t *testing.T) {
 		t.Errorf("Total = %d, want 0", list.Total)
 	}
 }
+
+func TestListSources_FilterByMultipleTeams(t *testing.T) {
+	// Register a server with vim mapped to a second team.
+	mux := http.NewServeMux()
+	RegisterRoutes(mux, testExcuses(), domain.TeamMappings{
+		"bash": "ubuntu-core",
+		"zlib": "ubuntu-core",
+		"vim":  "ubuntu-desktop",
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	// Both teams requested: all three packages should be returned.
+	resp, err := http.Get(srv.URL + "/sources?team=ubuntu-core&team=ubuntu-desktop")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	var list SourceListResponse
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		t.Fatal(err)
+	}
+	if list.Total != 3 {
+		t.Fatalf("Total = %d, want 3", list.Total)
+	}
+}

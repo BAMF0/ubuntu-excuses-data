@@ -30,7 +30,16 @@ func LoadTeamMappings(path string) (m TeamMappings, err error) {
 	if err = json.NewDecoder(f).Decode(&raw); err != nil {
 		return nil, fmt.Errorf("decode %s: %w", path, err)
 	}
-	return make(TeamMappings, len(raw)*8), err
+	m = make(TeamMappings, len(raw)*8)
+	for team, pkgs := range raw {
+		if team == "unsubscribed" {
+			continue
+		}
+		for _, pkg := range pkgs {
+			m[pkg] = team
+		}
+	}
+	return m, nil
 }
 
 // Team returns the team responsible for the given package, or empty string if unknown.

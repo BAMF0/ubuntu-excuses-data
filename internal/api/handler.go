@@ -118,7 +118,7 @@ func (h *Handler) ListBlocked(w http.ResponseWriter, r *http.Request) {
 
 	// Apply search/depends/team filters if present.
 	var filtered []domain.SourceIdx
-	if filters.Search != "" || filters.Depends != "" || filters.Team != "" {
+	if filters.Search != "" || filters.Depends != "" || len(filters.Teams) > 0 {
 		for _, idx := range idxs {
 			s := &h.excuses.Sources[idx]
 			if filters.Search != "" && !strings.Contains(s.SourcePackage, filters.Search) {
@@ -127,7 +127,7 @@ func (h *Handler) ListBlocked(w http.ResponseWriter, r *http.Request) {
 			if filters.Depends != "" && !dependsOn(s, filters.Depends) {
 				continue
 			}
-			if filters.Team != "" && h.teams.Team(s.SourcePackage) != filters.Team {
+			if len(filters.Teams) > 0 && !slices.Contains(filters.Teams, h.teams.Team(s.SourcePackage)) {
 				continue
 			}
 			filtered = append(filtered, idx)
@@ -212,7 +212,7 @@ func (h *Handler) filteredIdxs(f SourceFilters) []domain.SourceIdx {
 		if f.Depends != "" && !dependsOn(s, f.Depends) {
 			continue
 		}
-		if f.Team != "" && h.teams.Team(s.SourcePackage) != f.Team {
+		if len(f.Teams) > 0 && !slices.Contains(f.Teams, h.teams.Team(s.SourcePackage)) {
 			continue
 		}
 		out = append(out, idx)
