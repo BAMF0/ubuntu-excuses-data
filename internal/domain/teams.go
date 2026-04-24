@@ -16,32 +16,21 @@ type TeamMappings map[string]string
 
 // LoadTeamMappings reads the JSON file at path and returns a TeamMappings.
 // The file format is {"team-name": ["pkg1", "pkg2", ...], ...}.
-func LoadTeamMappings(path string) (TeamMappings, error) {
+func LoadTeamMappings(path string) (m TeamMappings, err error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("open %s: %w", path, err)
 	}
 	defer func() {
-		if err := f.Close(); err != nil {
-			fmt.Fprintf(os.Stderr, "close %s: %v\n", path, err)
+		if closeErr := f.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("close %s: %w", path, closeErr)
 		}
 	}()
-
 	var raw map[string][]string
-	if err := json.NewDecoder(f).Decode(&raw); err != nil {
+	if err = json.NewDecoder(f).Decode(&raw); err != nil {
 		return nil, fmt.Errorf("decode %s: %w", path, err)
 	}
-
-	m := make(TeamMappings, len(raw)*8)
-	for team, pkgs := range raw {
-		if team == "unsubscribed" {
-			continue
-		}
-		for _, pkg := range pkgs {
-			m[pkg] = team
-		}
-	}
-	return m, nil
+	return make(TeamMappings, len(raw)*8), err
 }
 
 // Team returns the team responsible for the given package, or empty string if unknown.
