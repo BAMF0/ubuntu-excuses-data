@@ -1,6 +1,7 @@
 package api
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/BAMF0/ubuntu-excuses-data/internal/domain"
@@ -8,14 +9,42 @@ import (
 
 // MetaResponse describes the dataset and its available filter values.
 type MetaResponse struct {
-	GeneratedDate   string   `json:"generated_date"`
-	TotalSources    int      `json:"total_sources"`
-	TotalCandidates int      `json:"total_candidates"`
-	Components      []string `json:"components"`
-	Verdicts        []string `json:"verdicts"`
-	Maintainers     []string `json:"maintainers"`
-	Arches          []string `json:"arches"`
-	Statuses        []string `json:"statuses"`
+	GeneratedDate        string         `json:"generated_date"`
+	TotalSources         int            `json:"total_sources"`
+	TotalCandidates      int            `json:"total_candidates"`
+	MigrationStatusCount map[string]int `json:"migration_status_counts"`
+	Components           []string       `json:"components"`
+	Verdicts             []string       `json:"verdicts"`
+	Maintainers          []string       `json:"maintainers"`
+	Arches               []string       `json:"arches"`
+	Statuses             []string       `json:"statuses"`
+	Teams                []string       `json:"teams"`
+}
+
+// BlockedSourceResponse is a slim JSON representation for the /blocked endpoint,
+// containing only the fields needed for triage before drilling into /sources/{name}.
+type BlockedSourceResponse struct {
+	SourcePackage  string              `json:"source_package"`
+	Team           string              `json:"team,omitempty"`
+	Verdict        string              `json:"verdict"`
+	OldVersion     string              `json:"old_version"`
+	NewVersion     string              `json:"new_version"`
+	Age            float64             `json:"age"`
+	HasAutopkgtest bool                `json:"has_autopkgtest"`
+	ExcuseDetail   string              `json:"excuse_detail,omitempty"`
+	Dependencies   *DependencyResponse `json:"dependencies,omitempty"`
+	Hints          []HintResponse      `json:"hints,omitempty"`
+}
+
+// BlockedListResponse is the paginated envelope for the /blocked endpoint.
+type BlockedListResponse struct {
+	GeneratedDate string                  `json:"generated_date"`
+	Total         int                     `json:"total"`
+	Offset        int                     `json:"offset"`
+	Limit         int                     `json:"limit"`
+	Sort          string                  `json:"sort"`
+	Order         string                  `json:"order"`
+	Sources       []BlockedSourceResponse `json:"sources"`
 }
 
 // SourceListResponse is the paginated envelope for a list of sources.
@@ -32,6 +61,7 @@ type SourceListResponse struct {
 // SourceResponse is the JSON representation of a single source package.
 type SourceResponse struct {
 	SourcePackage      string              `json:"source_package"`
+	Team               string              `json:"team,omitempty"`
 	Component          string              `json:"component"`
 	Maintainer         string              `json:"maintainer"`
 	Verdict            string              `json:"verdict"`
@@ -58,6 +88,7 @@ type ExcuseResponse struct {
 // DependencyResponse lists blocking and ordering dependencies.
 type DependencyResponse struct {
 	BlockedBy    []string `json:"blocked_by,omitempty"`
+	Blocks       []string `json:"blocks,omitempty"`
 	MigrateAfter []string `json:"migrate_after,omitempty"`
 }
 
@@ -115,25 +146,69 @@ type UpdateExcusePolicyResponse struct {
 	Bugs    map[string]int64 `json:"bugs,omitempty"`
 }
 
-// NewMetaResponse builds a MetaResponse from a domain.Excuses.
-func NewMetaResponse(e *domain.Excuses) MetaResponse {
-	return MetaResponse{
-		GeneratedDate:   e.GeneratedDate.UTC().Format("2006-01-02T15:04:05Z"),
-		TotalSources:    len(e.Sources),
-		TotalCandidates: len(e.Candidates),
-		Components:      e.Components,
-		Verdicts:        e.Verdicts,
-		Maintainers:     e.Maintainers,
-		Arches:          e.Arches,
-		Statuses:        e.Statuses,
+// NewMetaResponse builds a MetaResponse from a domain.Excuses and team mappings.
+func NewMetaResponse(e *domain.Excuses, teams domain.TeamMappings) MetaResponse {
+	counts := make(map[string]int, len(e.ByMigrationStatus))
+	for status, idxs := range e.ByMigrationStatus {
+		counts[status.String()] = len(idxs)
 	}
+
+	// Collect and sort unique team names.
+	seen := make(map[string]struct{}, len(teams))
+	for _, team := range teams {
+		if team != "" {
+			seen[team] = struct{}{}
+		}
+	}
+	teamList := make([]string, 0, len(seen))
+	for team := range seen {
+		teamList = append(teamList, team)
+	}
+	slices.Sort(teamList)
+
+	return MetaResponse{
+		GeneratedDate:        e.GeneratedDate.UTC().Format("2006-01-02T15:04:05Z"),
+		TotalSources:         len(e.Sources),
+		TotalCandidates:      len(e.Candidates),
+		MigrationStatusCount: counts,
+		Components:           e.Components,
+		Verdicts:             e.Verdicts,
+		Maintainers:          e.Maintainers,
+		Arches:               e.Arches,
+		Statuses:             e.Statuses,
+		Teams:                teamList,
+	}
+}
+
+// NewBlockedSourceResponse converts a domain.Source into the slim blocked DTO.
+func NewBlockedSourceResponse(e *domain.Excuses, teams domain.TeamMappings, s *domain.Source) BlockedSourceResponse {
+	r := BlockedSourceResponse{
+		SourcePackage:  s.SourcePackage,
+		Team:           teams.Team(s.SourcePackage),
+		Verdict:        e.Verdicts[s.VerdictID],
+		OldVersion:     s.OldVersion,
+		NewVersion:     s.NewVersion,
+		Age:            s.PolicyInfo.Age.CurrentAge,
+		HasAutopkgtest: len(s.PolicyInfo.Autopkgtest.Packages) > 0,
+		ExcuseDetail:   s.Excuse.Detail,
+		Hints:          newHintResponses(s.Hints),
+	}
+	if s.Dependencies.HasAny() {
+		r.Dependencies = &DependencyResponse{
+			BlockedBy:    s.Dependencies.BlockedBy,
+			Blocks:       s.Dependencies.Blocks,
+			MigrateAfter: s.Dependencies.MigrateAfter,
+		}
+	}
+	return r
 }
 
 // NewSourceResponse converts a domain.Source into its JSON DTO, resolving
 // all interned IDs using the parent Excuses.
-func NewSourceResponse(e *domain.Excuses, s *domain.Source) SourceResponse {
+func NewSourceResponse(e *domain.Excuses, teams domain.TeamMappings, s *domain.Source) SourceResponse {
 	r := SourceResponse{
 		SourcePackage:      s.SourcePackage,
+		Team:               teams.Team(s.SourcePackage),
 		Component:          e.Components[s.ComponentID],
 		Maintainer:         e.Maintainers[s.MaintainerID],
 		Verdict:            e.Verdicts[s.VerdictID],
@@ -155,6 +230,7 @@ func NewSourceResponse(e *domain.Excuses, s *domain.Source) SourceResponse {
 	if s.Dependencies.HasAny() {
 		r.Dependencies = &DependencyResponse{
 			BlockedBy:    s.Dependencies.BlockedBy,
+			Blocks:       s.Dependencies.Blocks,
 			MigrateAfter: s.Dependencies.MigrateAfter,
 		}
 	}

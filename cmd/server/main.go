@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/BAMF0/ubuntu-excuses-data/internal/api"
+	"github.com/BAMF0/ubuntu-excuses-data/internal/domain"
 	"github.com/BAMF0/ubuntu-excuses-data/internal/ingest"
 	yaml "github.com/BAMF0/ubuntu-excuses-data/internal/ingest/yaml"
 )
@@ -47,8 +48,17 @@ func main() {
 		len(excuses.Sources), len(excuses.Candidates),
 		excuses.GeneratedDate.Format("2006-01-02 15:04:05 UTC"))
 
+	teamMappingsPath := "package_team_mappings.json"
+	teams, err := domain.LoadTeamMappings(teamMappingsPath)
+	if err != nil {
+		log.Printf("warning: could not load team mappings from %s: %v", teamMappingsPath, err)
+		teams = domain.TeamMappings{}
+	} else {
+		fmt.Printf("Loaded team mappings for %d packages\n", len(teams))
+	}
+
 	mux := http.NewServeMux()
-	api.RegisterRoutes(mux, excuses)
+	api.RegisterRoutes(mux, excuses, teams)
 
 	srv := &http.Server{
 		Addr:         addr,

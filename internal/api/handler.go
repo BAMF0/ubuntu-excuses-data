@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/BAMF0/ubuntu-excuses-data/internal/domain"
 )
@@ -16,6 +17,7 @@ import (
 // is immutable after startup.
 type Handler struct {
 	excuses *domain.Excuses
+	teams   domain.TeamMappings
 
 	// Pre-computed at construction time.
 	allSorted    []domain.SourceIdx // sorted by age ascending with name tiebreak, computed once
@@ -24,10 +26,10 @@ type Handler struct {
 
 // NewHandler creates a Handler backed by the given Excuses dataset and
 // pre-computes derived data that would otherwise be rebuilt per-request.
-func NewHandler(e *domain.Excuses) *Handler {
-	h := &Handler{excuses: e}
+func NewHandler(e *domain.Excuses, teams domain.TeamMappings) *Handler {
+	h := &Handler{excuses: e, teams: teams}
 	h.allSorted = h.computeSortedIdxs()
-	h.metaRespJSON = mustMarshalJSON(NewMetaResponse(e))
+	h.metaRespJSON = mustMarshalJSON(NewMetaResponse(e, teams))
 	return h
 }
 
@@ -67,7 +69,7 @@ func (h *Handler) ListSources(w http.ResponseWriter, r *http.Request) {
 
 	items := make([]SourceResponse, 0, end-start)
 	for _, idx := range idxs[start:end] {
-		items = append(items, NewSourceResponse(h.excuses, &h.excuses.Sources[idx]))
+		items = append(items, NewSourceResponse(h.excuses, h.teams, &h.excuses.Sources[idx]))
 	}
 
 	writeJSON(w, http.StatusOK, SourceListResponse{
@@ -89,7 +91,7 @@ func (h *Handler) GetSource(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "source not found: "+name)
 		return
 	}
-	writeJSON(w, http.StatusOK, NewSourceResponse(h.excuses, s))
+	writeJSON(w, http.StatusOK, NewSourceResponse(h.excuses, h.teams, s))
 }
 
 // GetSourceAutopkgtest returns the autopkgtest results for a single source.
@@ -101,6 +103,58 @@ func (h *Handler) GetSourceAutopkgtest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, newAutopkgtestPolicyResponse(h.excuses, &s.PolicyInfo.Autopkgtest))
+}
+
+// ListBlocked returns a paginated list of sources with BLOCKED migration status.
+func (h *Handler) ListBlocked(w http.ResponseWriter, r *http.Request) {
+	filters := ParseSourceFilters(r)
+	page := ParsePagination(r)
+	sortOrder := ParseSortOrder(r)
+
+	idxs := h.excuses.ByMigrationStatus[domain.StatusBlocked]
+	if idxs == nil {
+		idxs = []domain.SourceIdx{}
+	}
+
+	// Apply search/depends/team filters if present.
+	var filtered []domain.SourceIdx
+	if filters.Search != "" || filters.Depends != "" || filters.Team != "" {
+		for _, idx := range idxs {
+			s := &h.excuses.Sources[idx]
+			if filters.Search != "" && !strings.Contains(s.SourcePackage, filters.Search) {
+				continue
+			}
+			if filters.Depends != "" && !dependsOn(s, filters.Depends) {
+				continue
+			}
+			if filters.Team != "" && h.teams.Team(s.SourcePackage) != filters.Team {
+				continue
+			}
+			filtered = append(filtered, idx)
+		}
+	} else {
+		filtered = slices.Clone(idxs)
+	}
+
+	h.sortIdxs(filtered, sortOrder)
+
+	total := len(filtered)
+	start, end := clampRange(page.Offset, page.Limit, total)
+
+	items := make([]BlockedSourceResponse, 0, end-start)
+	for _, idx := range filtered[start:end] {
+		items = append(items, NewBlockedSourceResponse(h.excuses, h.teams, &h.excuses.Sources[idx]))
+	}
+
+	writeJSON(w, http.StatusOK, BlockedListResponse{
+		GeneratedDate: h.excuses.GeneratedDate.UTC().Format("2006-01-02T15:04:05Z"),
+		Total:         total,
+		Offset:        page.Offset,
+		Limit:         page.Limit,
+		Sort:          sortOrder.Field.String(),
+		Order:         sortOrder.Direction.String(),
+		Sources:       items,
+	})
 }
 
 // filteredIdxs returns the set of source indexes matching the given filters.
@@ -152,9 +206,26 @@ func (h *Handler) filteredIdxs(f SourceFilters) []domain.SourceIdx {
 		if f.MigrationStatus != "" && s.Excuse.Status.String() != f.MigrationStatus {
 			continue
 		}
+		if f.Search != "" && !strings.Contains(s.SourcePackage, f.Search) {
+			continue
+		}
+		if f.Depends != "" && !dependsOn(s, f.Depends) {
+			continue
+		}
+		if f.Team != "" && h.teams.Team(s.SourcePackage) != f.Team {
+			continue
+		}
 		out = append(out, idx)
 	}
 	return out
+}
+
+// dependsOn returns true if the source has a dependency relationship
+// (blocked_by, blocks, or migrate_after) involving the named package.
+func dependsOn(s *domain.Source, name string) bool {
+	return slices.Contains(s.Dependencies.BlockedBy, name) ||
+		slices.Contains(s.Dependencies.Blocks, name) ||
+		slices.Contains(s.Dependencies.MigrateAfter, name)
 }
 
 // computeSortedIdxs builds the default-sorted (age ascending, name tiebreak)
