@@ -871,3 +871,55 @@ func TestListBlocked_Depends(t *testing.T) {
 		t.Errorf("source = %q, want zlib", list.Sources[0].SourcePackage)
 	}
 }
+
+func TestListSources_FilterByTeam(t *testing.T) {
+	srv := newTestServer(testExcuses())
+	defer srv.Close()
+
+	// bash and zlib are both in ubuntu-core; team=ubuntu-core must return exactly those two.
+	resp, err := http.Get(srv.URL + "/sources?team=ubuntu-core")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	var list SourceListResponse
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		t.Fatal(err)
+	}
+	if list.Total != 2 {
+		t.Fatalf("Total = %d, want 2", list.Total)
+	}
+	for _, s := range list.Sources {
+		if s.Team != "ubuntu-core" {
+			t.Errorf("source %q has team %q, want ubuntu-core", s.SourcePackage, s.Team)
+		}
+	}
+}
+
+func TestListSources_FilterByTeamNoMatch(t *testing.T) {
+	srv := newTestServer(testExcuses())
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/sources?team=nonexistent-team")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	var list SourceListResponse
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		t.Fatal(err)
+	}
+	if list.Total != 0 {
+		t.Errorf("Total = %d, want 0", list.Total)
+	}
+}

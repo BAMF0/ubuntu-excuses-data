@@ -212,6 +212,9 @@ func (h *Handler) filteredIdxs(f SourceFilters) []domain.SourceIdx {
 		if f.Depends != "" && !dependsOn(s, f.Depends) {
 			continue
 		}
+		if f.Team != "" && h.teams.Team(s.SourcePackage) != f.Team {
+			continue
+		}
 		out = append(out, idx)
 	}
 	return out
